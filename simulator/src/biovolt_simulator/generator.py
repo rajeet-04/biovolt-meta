@@ -92,6 +92,7 @@ class TelemetryGenerator:
         self._random = random.Random(seed)
         self._next_sequence = start_sequence
         self._state = SimulatorState(sequence=start_sequence - 1, uptime_ms=0)
+        self._last_elapsed_seconds: float | None = None
 
     @property
     def state(self) -> SimulatorState:
@@ -107,6 +108,11 @@ class TelemetryGenerator:
 
         sequence = self._next_sequence
         uptime_ms = int(round(elapsed_seconds * 1000))
+        if (
+            self._last_elapsed_seconds is not None
+            and elapsed_seconds < self._last_elapsed_seconds
+        ):
+            raise ValueError("elapsed_seconds must not regress simulator uptime")
         if uptime_ms < self._state.uptime_ms:
             raise ValueError("elapsed_seconds must not regress simulator uptime")
         od_target = self.start_od + self.growth_rate_per_second * elapsed_seconds
@@ -170,6 +176,7 @@ class TelemetryGenerator:
         validate_telemetry_frame(frame)
         self._state = SimulatorState(sequence=sequence, uptime_ms=uptime_ms)
         self._next_sequence += 1
+        self._last_elapsed_seconds = elapsed_seconds
         return frame
 
     def _noise(self, amplitude: float) -> float:

@@ -36,6 +36,20 @@ def test_elapsed_time_regression_is_rejected_without_mutating_state() -> None:
     assert generator.next_frame(1.5)["sequence"] == state_before.sequence + 1
 
 
+def test_sub_millisecond_elapsed_regression_is_rejected_without_mutation() -> None:
+    generator = TelemetryGenerator(seed=42, device_id="d1", cell_id="c1")
+
+    generator.next_frame(1.0004)
+    state_before = generator.state
+    random_state_before = generator._random.getstate()
+
+    with pytest.raises(ValueError, match="must not regress"):
+        generator.next_frame(1.0003)
+
+    assert generator.state == state_before
+    assert generator._random.getstate() == random_state_before
+
+
 def test_growth_reduces_transmitted_light_without_noise() -> None:
     generator = TelemetryGenerator(
         seed=42,
