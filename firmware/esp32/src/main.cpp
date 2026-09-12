@@ -6,6 +6,11 @@
 #include "provisioning/SerialProvisioner.h"
 #include "sensors/SensorManager.h"
 #include "actuators/ActuatorController.h"
+#include "runtime/ActuatorTask.h"
+#include "runtime/ControlTask.h"
+#include "runtime/ProvisioningTask.h"
+#include "runtime/RuntimeStateStore.h"
+#include "runtime/SensorTask.h"
 
 #if __has_include("BuildSecrets.h")
 #include "BuildSecrets.h"
@@ -29,7 +34,12 @@ GrowLightDriver growLight;
 MixerDriver mixer;
 SafetyPolicy safetyPolicy({});
 ActuatorController actuatorController(growLight, mixer, safetyPolicy);
-uint64_t lastSensorSampleMs = 0;
+RuntimeStateStore runtimeState;
+QueueHandle_t actuatorQueue = nullptr;
+SensorTaskContext sensorTaskContext{&sensorManager, &runtimeState};
+ControlTaskContext controlTaskContext{&runtimeState, nullptr};
+ActuatorTaskContext actuatorTaskContext{&actuatorController, &runtimeState, nullptr};
+ProvisioningTaskContext provisioningTaskContext{&provisioner};
 
 RuntimeConfig buildFallbackConfig() {
   RuntimeConfig config;
@@ -67,23 +77,34 @@ void setup() {
                                       static_cast<uint32_t>(activeConfig.mixerCooldownS) * 1000U});
   actuatorController.begin();
   sensorManager.begin();
+  const bool stateReady = runtimeState.begin();
+  actuatorQueue = xQueueCreate(1, sizeof(ActuatorRequest));
+  controlTaskContext.actuatorQueue = actuatorQueue;
+  actuatorTaskContext.actuatorQueue = actuatorQueue;
 
   if (!validateRuntimeConfig(activeConfig).valid) {
     Serial.println("Configuration invalid; actuators remain off and serial provisioning is available");
-    return;
   }
 
-  // Network, telemetry, and FreeRTOS runtime start in later firmware modules.
-  Serial.println("Configuration loaded for this boot");
+  if (!stateReady || !actuatorQueue) {
+    Serial.println("Runtime state or actuator queue unavailable; outputs remain safe");
+    setActuatorsSafe();
+    return;
+  }
+  const BaseType_t sensorTask = xTaskCreatePinnedToCore(sensorTaskEntry, "sensor", 4096,
+                                                         &sensorTaskContext, 3, nullptr, 1);
+  const BaseType_t controlTask = xTaskCreatePinnedToCore(controlTaskEntry, "control", 3072,
+                                                          &controlTaskContext, 3, nullptr, 1);
+  const BaseType_t actuatorTask = xTaskCreatePinnedToCore(actuatorTaskEntry, "actuator", 3072,
+                                                           &actuatorTaskContext, 3, nullptr, 1);
+  const BaseType_t provisioningTask = xTaskCreate(provisioningTaskEntry, "provision", 3072,
+                                                  &provisioningTaskContext, 1, nullptr);
+  if (sensorTask != pdPASS || controlTask != pdPASS || actuatorTask != pdPASS || provisioningTask != pdPASS) {
+    Serial.println("Runtime task creation failed; outputs remain safe");
+    setActuatorsSafe();
+  }
 }
 
 void loop() {
-  provisioner.poll();
-  const uint64_t nowMs = millis();
-  if (nowMs - lastSensorSampleMs >= 500) {
-    lastSensorSampleMs = nowMs;
-    actuatorController.enforceTimeouts(nowMs);
-    sensorManager.sample(nowMs);
-  }
-  vTaskDelay(pdMS_TO_TICKS(10));
+  vTaskDelay(pdMS_TO_TICKS(1000));
 }
