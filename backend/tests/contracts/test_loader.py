@@ -63,3 +63,14 @@ def test_processed_payload_accepts_rfc3339_lowercase_markers(timestamp):
     payload["timestamp"] = timestamp
 
     validate_payload("processed-telemetry.v1.schema.json", payload)
+
+
+def test_processed_payload_rejects_timestamp_with_terminal_newline():
+    repo = Path(__file__).resolve().parents[3]
+    payload = json.loads(
+        (repo / "shared/examples/processed-telemetry.example.json").read_text(encoding="utf-8")
+    )
+    payload["timestamp"] += "\n"
+
+    with pytest.raises(ValidationError):
+        validate_payload("processed-telemetry.v1.schema.json", payload)

@@ -7,7 +7,12 @@ from rfc3339_validator import validate_rfc3339
 
 
 def _is_rfc3339_datetime(value: object) -> bool:
-    if not isinstance(value, str) or len(value) < 11 or value[10] not in "Tt":
+    if (
+        not isinstance(value, str)
+        or value != value.strip()
+        or len(value) < 11
+        or value[10] not in "Tt"
+    ):
         return False
     normalized = value[:10] + "T" + value[11:]
     if normalized.endswith("z"):
