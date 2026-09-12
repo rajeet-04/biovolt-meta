@@ -34,7 +34,8 @@ REQUIRED_FILES += [
 ]
 
 FORBIDDEN_PHASE_ZERO_FILES = [
-    "docker-compose.yml",
+    # Docker Compose is introduced by Phase 1.6; retain the remaining
+    # runtime-entrypoint guards for Phase 0 repository completeness.
     "backend/app/main.py",
     "frontend/package.json",
     "firmware/esp32/platformio.ini",
