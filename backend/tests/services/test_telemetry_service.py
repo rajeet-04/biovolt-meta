@@ -246,3 +246,24 @@ async def test_handle_raw_rejects_json_nan_before_side_effects() -> None:
     assert repository.calls == []
     assert hub.payloads == []
     assert registry.calls == []
+
+
+async def test_handle_raw_rejects_overflowing_power_before_side_effects() -> None:
+    events: list[str] = []
+    service, energy, throttle, repository, hub, registry = service_with_fakes(events)
+    payload = canonical_payload()
+    payload["electrical"]["bpv_voltage_mv"] = 1e200  # type: ignore[index]
+
+    with pytest.raises(TelemetryRejected, match="telemetry calculation overflow"):
+        await service.handle_raw(
+            payload,
+            "biovolt-01",
+            datetime(2026, 8, 23, 12, 0, tzinfo=UTC),
+        )
+
+    assert events == []
+    assert energy.calls == []
+    assert throttle.calls == []
+    assert repository.calls == []
+    assert hub.payloads == []
+    assert registry.calls == []

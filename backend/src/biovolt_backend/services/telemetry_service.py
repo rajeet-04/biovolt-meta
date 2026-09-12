@@ -35,6 +35,18 @@ def _ensure_finite_payload(value: object) -> None:
             _ensure_finite_payload(nested)
 
 
+def _safe_power_uw(voltage_mv: float, resistance_ohm: float) -> float:
+    """Calculate power without allowing arithmetic overflow into stateful work."""
+
+    try:
+        power = power_uw(voltage_mv, resistance_ohm)
+    except OverflowError as exc:
+        raise TelemetryRejected("telemetry calculation overflow") from exc
+    if not math.isfinite(power):
+        raise TelemetryRejected("telemetry calculation overflow")
+    return power
+
+
 class TelemetryService:
     """Process one authenticated device telemetry frame."""
 
@@ -78,7 +90,7 @@ class TelemetryService:
 
         voltage_mv = raw.electrical.bpv_voltage_mv
         measured_power_uw = (
-            power_uw(voltage_mv, self._config.load_resistance_ohm)
+            _safe_power_uw(voltage_mv, self._config.load_resistance_ohm)
             if voltage_mv is not None
             else None
         )

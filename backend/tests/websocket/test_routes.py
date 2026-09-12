@@ -117,6 +117,33 @@ def test_malformed_device_frame_returns_error_and_connection_continues(tmp_path)
                 assert dashboard.receive_json()["sequence"] == 1245
 
 
+def test_overflowing_device_frame_returns_error_and_connection_continues(tmp_path) -> None:
+    app = create_app(
+        Settings(
+            environment="test",
+            database_url=f"sqlite+aiosqlite:///{tmp_path / 'routes.db'}",
+            device_shared_token=DEVICE_TOKEN,
+        )
+    )
+    overflowing = canonical_payload()
+    overflowing["electrical"]["bpv_voltage_mv"] = 1e200  # type: ignore[index]
+
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws/dashboard") as dashboard:
+            with client.websocket_connect(
+                "/ws/device",
+                headers={
+                    "X-BioVolt-Device-ID": DEVICE_ID,
+                    "Authorization": f"Bearer {DEVICE_TOKEN}",
+                },
+            ) as device:
+                device.send_json(overflowing)
+                assert device.receive_json() == {"error": "invalid telemetry frame"}
+
+                device.send_json(canonical_payload())
+                assert dashboard.receive_json()["sequence"] == 1245
+
+
 def test_dashboard_is_read_only_and_ignores_client_commands(tmp_path) -> None:
     app = create_app(
         Settings(
