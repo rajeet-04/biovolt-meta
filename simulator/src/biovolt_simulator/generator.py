@@ -12,6 +12,8 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+from .faults import SUPPORTED_FAULTS, apply_fault
+
 
 @dataclass(frozen=True)
 class SimulatorState:
@@ -59,6 +61,7 @@ class TelemetryGenerator:
         voltage_noise_amplitude: float = 0.8,
         lux_noise_amplitude: float = 4.0,
         noise_amplitude: float | None = None,
+        fault: str | None = None,
     ) -> None:
         if not device_id.strip() or not cell_id.strip():
             raise ValueError("device_id and cell_id must not be blank")
@@ -79,6 +82,11 @@ class TelemetryGenerator:
         )
         if any(amplitude < 0 for amplitude in amplitudes):
             raise ValueError("noise amplitudes must be non-negative")
+        if fault is not None and fault not in SUPPORTED_FAULTS:
+            options = ", ".join(sorted(SUPPORTED_FAULTS))
+            raise ValueError(
+                f"unknown simulator fault {fault!r}; choose one of: {options}"
+            )
 
         self.device_id = device_id
         self.cell_id = cell_id
@@ -89,6 +97,7 @@ class TelemetryGenerator:
             self.voltage_noise_amplitude,
             self.lux_noise_amplitude,
         ) = amplitudes
+        self.fault = fault
         self._random = random.Random(seed)
         self._next_sequence = start_sequence
         self._state = SimulatorState(sequence=start_sequence - 1, uptime_ms=0)
@@ -173,6 +182,8 @@ class TelemetryGenerator:
                 "light_sensor_ok": True,
             },
         }
+        if self.fault is not None:
+            frame = apply_fault(frame, self.fault)
         validate_telemetry_frame(frame)
         self._state = SimulatorState(sequence=sequence, uptime_ms=uptime_ms)
         self._next_sequence += 1
