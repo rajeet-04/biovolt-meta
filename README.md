@@ -57,6 +57,26 @@ they are defined, avoiding blank strings that strict Pydantic float settings
 cannot parse. Stop and restart services without `docker compose down -v` to
 keep persisted telemetry; `down -v` intentionally removes the named volume.
 
+## Phase 1 acceptance checks
+
+With the simulator profile running, execute the short smoke check followed by
+the manual 30-minute soak gate:
+
+```bash
+docker compose --profile simulator up --build -d
+python scripts/phase1_smoke.py
+python scripts/soak_phase1.py --minutes 30
+```
+
+The smoke check validates backend health, simulator registration, derived
+power, and multiple persisted samples. The soak check polls every 30 seconds,
+requires fresh telemetry, tolerates a bounded simulator reconnect, rejects
+negative cumulative energy, and checks the persisted-row rate against a 90% to
+110% range. The history endpoint is bounded to 1,000 samples; if a longer run
+fills that window, the script reports the limitation while continuing to check
+freshness and monotonic history. Both scripts are read-only and do not print or
+accept device tokens.
+
 ## Scientific Ownership Rule
 
 Raw ESP32 telemetry contains measured/control-state values only. Current, power, OD680, biomass, estimated CO2 biofixed into biomass, cumulative energy, and server timestamps are derived by the backend.
