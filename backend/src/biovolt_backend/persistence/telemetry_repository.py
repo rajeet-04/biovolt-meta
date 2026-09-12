@@ -37,6 +37,7 @@ class TelemetryRepository:
             cell_id=raw.cell_id,
             sequence=raw.sequence,
             uptime_ms=raw.uptime_ms,
+            load_resistance_ohm=processed.electrical.load_resistance_ohm,
             bpv_voltage_mv=processed.electrical.voltage_mv,
             current_ua=processed.electrical.current_ua,
             power_uw=processed.electrical.power_uw,

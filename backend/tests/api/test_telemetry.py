@@ -19,6 +19,7 @@ def _sample(sequence: int = 1245) -> SimpleNamespace:
         bpv_voltage_mv=438.2,
         current_ua=4.382,
         power_uw=1.9201924,
+        load_resistance_ohm=100_000.0,
         cumulative_energy_mj=1.25,
         od680=0.42,
         temperature_c=24.5,
@@ -52,11 +53,12 @@ class FakeTelemetryRepository:
         return self.history_result
 
 
-def _app(tmp_path):
+def _app(tmp_path, load_resistance_ohm: float = 100_000.0):
     return create_app(
         Settings(
             environment="test",
             database_url=f"sqlite+aiosqlite:///{tmp_path / 'telemetry.db'}",
+            load_resistance_ohm=load_resistance_ohm,
         )
     )
 
@@ -76,6 +78,24 @@ def test_latest_returns_404_when_repository_has_no_data(tmp_path) -> None:
     assert response.status_code == 404
     assert response.json() == {"detail": "telemetry not found"}
     assert repository.latest_calls == [("biovolt-01", "cell-a")]
+
+
+def test_latest_preserves_sample_time_load_resistance_provenance(tmp_path) -> None:
+    app = _app(tmp_path, load_resistance_ohm=200_000.0)
+
+    with TestClient(app) as client:
+        repository = FakeTelemetryRepository(latest_result=_sample())
+        client.app.state.telemetry_repository = repository
+
+        response = client.get(
+            "/api/telemetry/latest",
+            params={"device_id": "biovolt-01", "cell_id": "cell-a"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["electrical"]["load_resistance_ohm"] == 100_000.0
+    validate_payload("processed-telemetry.v1.schema.json", body)
 
 
 def test_latest_returns_processed_row_through_repository(tmp_path) -> None:

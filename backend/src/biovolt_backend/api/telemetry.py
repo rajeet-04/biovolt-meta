@@ -17,7 +17,7 @@ def _timestamp_text(value: datetime) -> str:
     return aware.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
-def _serialize_sample(sample: Any, load_resistance_ohm: float) -> dict[str, Any]:
+def _serialize_sample(sample: Any) -> dict[str, Any]:
     """Expose a persisted sample in the processed telemetry shape."""
 
     timestamp = _timestamp_text(sample.received_at)
@@ -31,7 +31,7 @@ def _serialize_sample(sample: Any, load_resistance_ohm: float) -> dict[str, Any]
             "voltage_mv": sample.bpv_voltage_mv,
             "current_ua": sample.current_ua,
             "power_uw": sample.power_uw,
-            "load_resistance_ohm": load_resistance_ohm,
+            "load_resistance_ohm": sample.load_resistance_ohm,
             "cumulative_energy_mj": sample.cumulative_energy_mj,
         },
         "biological": {
@@ -64,7 +64,7 @@ async def latest_telemetry(
     sample = await request.app.state.telemetry_repository.latest(device_id, cell_id)
     if sample is None:
         raise HTTPException(status_code=404, detail="telemetry not found")
-    return _serialize_sample(sample, request.app.state.settings.load_resistance_ohm)
+    return _serialize_sample(sample)
 
 
 @router.get("/history")
@@ -77,7 +77,4 @@ async def telemetry_history(
     """Return a bounded chronological window of processed samples."""
 
     samples = await request.app.state.telemetry_repository.history(device_id, cell_id, limit)
-    return [
-        _serialize_sample(sample, request.app.state.settings.load_resistance_ohm)
-        for sample in samples
-    ]
+    return [_serialize_sample(sample) for sample in samples]

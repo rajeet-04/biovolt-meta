@@ -32,6 +32,7 @@ async def test_telemetry_sample_preserves_nullable_sensor_values(tmp_path):
         cell_id="cell-1",
         sequence=1,
         uptime_ms=100,
+        load_resistance_ohm=100_000.0,
         temperature_c=None,
         grow_led_pwm=0,
         mixer_on=False,
@@ -63,6 +64,7 @@ async def test_telemetry_sample_preserves_aware_received_at(tmp_path):
         cell_id="cell-1",
         sequence=1,
         uptime_ms=100,
+        load_resistance_ohm=100_000.0,
         grow_led_pwm=0,
         mixer_on=False,
         control_mode="monitor",
@@ -85,7 +87,8 @@ async def test_telemetry_sample_preserves_aware_received_at(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "required_column", ["grow_led_pwm", "mixer_on", "control_mode", "raw_payload_json"]
+    "required_column",
+    ["grow_led_pwm", "mixer_on", "control_mode", "raw_payload_json", "load_resistance_ohm"],
 )
 async def test_telemetry_sample_rejects_null_required_columns(tmp_path, required_column):
     engine, session_factory = create_engine_and_session(
@@ -98,6 +101,7 @@ async def test_telemetry_sample_rejects_null_required_columns(tmp_path, required
         "cell_id": "cell-1",
         "sequence": 1,
         "uptime_ms": 100,
+        "load_resistance_ohm": 100_000.0,
         "grow_led_pwm": 0,
         "mixer_on": False,
         "control_mode": "monitor",

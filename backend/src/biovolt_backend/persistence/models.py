@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Index, String, TypeDecorator
+from sqlalchemy import JSON, DateTime, Float, Index, String, TypeDecorator
 from sqlalchemy.orm import Mapped, mapped_column
 
 from biovolt_backend.persistence.database import Base
@@ -47,6 +47,7 @@ class TelemetrySample(Base):
     cell_id: Mapped[str] = mapped_column(String(64), nullable=False)
     sequence: Mapped[int] = mapped_column(nullable=False)
     uptime_ms: Mapped[int] = mapped_column(nullable=False)
+    load_resistance_ohm: Mapped[float] = mapped_column(Float, nullable=False)
 
     bpv_voltage_mv: Mapped[float | None] = mapped_column(nullable=True)
     current_ua: Mapped[float | None] = mapped_column(nullable=True)
