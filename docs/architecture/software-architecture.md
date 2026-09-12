@@ -167,6 +167,14 @@ Approved experiment modes:
 - Cloudflared public access defaults to read-only
 - secrets must not be embedded in frontend JavaScript
 
+## Command protocol boundary
+
+The authenticated device socket carries raw telemetry plus separate versioned
+`device-command.v1` and `device-ack.v1` envelopes. Commands are finite,
+idempotent UUID-correlated requests; only a device `applied` acknowledgement
+confirms a hardware state change. Expired, unsupported, or unsafe commands are
+rejected without bypassing ESP32 safety.
+
 ## Phase 0 boundary
 
 Phase 0 implements **contracts and repository foundation only**.

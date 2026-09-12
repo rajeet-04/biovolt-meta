@@ -4,140 +4,23 @@
   "title": "BioVolt Device Command v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "command_id", "type", "payload"],
+  "required": ["schema_version", "command_id", "device_id", "experiment_id", "issued_at", "expires_at", "ttl_ms", "kind", "payload"],
   "properties": {
-    "schema_version": {"const": 1},
-    "command_id": {"type": "string", "minLength": 1, "maxLength": 64},
-    "type": {
-      "type": "string",
-      "enum": [
-        "set_mode",
-        "set_led_pwm",
-        "set_mixer",
-        "set_mixer_schedule",
-        "start_experiment",
-        "stop_experiment",
-        "sync_config",
-        "ping"
-      ]
-    },
+    "schema_version": {"const": "device-command.v1"},
+    "command_id": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+    "device_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "experiment_id": {"type": ["string", "null"], "maxLength": 64},
+    "issued_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "ttl_ms": {"type": "integer", "minimum": 1, "maximum": 600000},
+    "kind": {"enum": ["set_mode", "set_led_pwm", "set_mixer", "request_status", "safe_stop"]},
     "payload": {"type": "object"}
   },
   "oneOf": [
-    {
-      "properties": {
-        "type": {"const": "set_mode"},
-        "payload": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["mode"],
-          "properties": {
-            "mode": {
-              "type": "string",
-              "enum": ["monitor", "passive", "adaptive", "manual"]
-            }
-          }
-        }
-      }
-    },
-    {
-      "properties": {
-        "type": {"const": "set_led_pwm"},
-        "payload": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["value"],
-          "properties": {
-            "value": {"type": "integer", "minimum": 0, "maximum": 255}
-          }
-        }
-      }
-    },
-    {
-      "properties": {
-        "type": {"const": "set_mixer"},
-        "payload": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["on"],
-          "properties": {"on": {"type": "boolean"}}
-        }
-      }
-    },
-    {
-      "properties": {
-        "type": {"const": "set_mixer_schedule"},
-        "payload": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["interval_s", "duration_s"],
-          "properties": {
-            "interval_s": {"type": "integer", "minimum": 0},
-            "duration_s": {"type": "integer", "minimum": 1}
-          }
-        }
-      }
-    },
-    {
-      "properties": {
-        "type": {"const": "start_experiment"},
-        "payload": {"$ref": "#/$defs/experiment_reference"}
-      }
-    },
-    {
-      "properties": {
-        "type": {"const": "stop_experiment"},
-        "payload": {"$ref": "#/$defs/experiment_reference"}
-      }
-    },
-    {
-      "properties": {
-        "type": {"const": "sync_config"},
-        "payload": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "calibration_profile_id",
-            "load_resistance_ohm",
-            "led_pwm_min",
-            "led_pwm_max",
-            "mixer_max_runtime_s",
-            "mixer_cooldown_s"
-          ],
-          "properties": {
-            "calibration_profile_id": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 64
-            },
-            "load_resistance_ohm": {"type": "number", "exclusiveMinimum": 0},
-            "led_pwm_min": {"type": "integer", "minimum": 0, "maximum": 255},
-            "led_pwm_max": {"type": "integer", "minimum": 0, "maximum": 255},
-            "mixer_max_runtime_s": {"type": "integer", "minimum": 0},
-            "mixer_cooldown_s": {"type": "integer", "minimum": 0}
-          }
-        }
-      }
-    },
-    {
-      "properties": {
-        "type": {"const": "ping"},
-        "payload": {
-          "type": "object",
-          "additionalProperties": false,
-          "maxProperties": 0
-        }
-      }
-    }
-  ],
-  "$defs": {
-    "experiment_reference": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["experiment_id"],
-      "properties": {
-        "experiment_id": {"type": "string", "minLength": 1, "maxLength": 64}
-      }
-    }
-  }
+    {"properties": {"kind": {"const": "set_mode"}, "payload": {"type": "object", "additionalProperties": false, "required": ["mode"], "properties": {"mode": {"enum": ["monitor", "passive", "manual", "adaptive"]}}}}},
+    {"properties": {"kind": {"const": "set_led_pwm"}, "payload": {"type": "object", "additionalProperties": false, "required": ["pwm"], "properties": {"pwm": {"type": "integer", "minimum": 0, "maximum": 255}}}}},
+    {"properties": {"kind": {"const": "set_mixer"}, "payload": {"type": "object", "additionalProperties": false, "required": ["on"], "properties": {"on": {"type": "boolean"}}}}},
+    {"properties": {"kind": {"const": "request_status"}, "payload": {"type": "object", "additionalProperties": false, "maxProperties": 0}}},
+    {"properties": {"kind": {"const": "safe_stop"}, "payload": {"type": "object", "additionalProperties": false, "maxProperties": 0}}}
+  ]
 }

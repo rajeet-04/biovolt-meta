@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://biovolt.local/schemas/device-ack.v1.schema.json",
+  "title": "BioVolt Device Acknowledgement v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "command_id", "device_id", "status", "uptime_ms", "reason_code", "message", "applied_state"],
+  "properties": {
+    "schema_version": {"const": "device-ack.v1"},
+    "command_id": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+    "device_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "status": {"enum": ["accepted", "applied", "rejected", "failed"]},
+    "uptime_ms": {"type": "integer", "minimum": 0},
+    "reason_code": {"type": ["string", "null"], "enum": [null, "expired", "invalid_payload", "unsupported_command", "phase_not_available", "safety_rejected", "cooldown_active", "hardware_failure", "internal_error"]},
+    "message": {"type": ["string", "null"], "maxLength": 256},
+    "applied_state": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["mode", "grow_led_pwm", "mixer_on"], "properties": {"mode": {"enum": ["monitor", "passive", "manual", "adaptive"]}, "grow_led_pwm": {"type": "integer", "minimum": 0, "maximum": 255}, "mixer_on": {"type": "boolean"}}}]}
+  }
+}

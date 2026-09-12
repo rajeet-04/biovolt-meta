@@ -21,6 +21,10 @@ CONTRACTS = {
         "shared/schemas/device-command.v1.schema.json",
         "shared/examples/device-command.example.json",
     ),
+    "device acknowledgement": (
+        "shared/schemas/device-ack.v1.schema.json",
+        "shared/examples/device-ack.example.json",
+    ),
     "calibration profile": (
         "shared/schemas/calibration-profile.v1.schema.json",
         "shared/examples/calibration-profile.example.json",
