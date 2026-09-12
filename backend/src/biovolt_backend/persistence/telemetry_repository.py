@@ -16,6 +16,13 @@ class TelemetryRepository:
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         self._session_factory = session_factory
 
+    async def health_check(self) -> bool:
+        """Verify that the repository can reach its configured database."""
+
+        async with self._session_factory() as session:
+            await session.execute(select(1))
+        return True
+
     async def save(
         self,
         raw: DeviceTelemetryV1,

@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 from biovolt_backend.config import Settings
+from biovolt_backend.contracts.loader import validate_payload
 from biovolt_backend.main import create_app
 
 
@@ -38,6 +39,9 @@ class FakeTelemetryRepository:
         self.history_result = history_result or []
         self.latest_calls: list[tuple[str, str]] = []
         self.history_calls: list[tuple[str, str, int]] = []
+
+    async def health_check(self) -> bool:
+        return True
 
     async def latest(self, device_id: str, cell_id: str):
         self.latest_calls.append((device_id, cell_id))
@@ -100,6 +104,7 @@ def test_latest_returns_processed_row_through_repository(tmp_path) -> None:
         "cumulative_energy_mj": 1.25,
     }
     assert body["biological"]["od680"] == 0.42
+    validate_payload("processed-telemetry.v1.schema.json", body)
     assert repository.latest_calls == [("biovolt-01", "cell-a")]
 
 
@@ -116,7 +121,10 @@ def test_history_uses_bounded_default_limit_and_returns_rows(tmp_path) -> None:
         )
 
     assert response.status_code == 200
-    assert [row["sequence"] for row in response.json()] == [1, 2]
+    rows = response.json()
+    assert [row["sequence"] for row in rows] == [1, 2]
+    for row in rows:
+        validate_payload("processed-telemetry.v1.schema.json", row)
     assert repository.history_calls == [("biovolt-01", "cell-a", 100)]
 
 

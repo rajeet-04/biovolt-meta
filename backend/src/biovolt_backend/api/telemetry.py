@@ -22,14 +22,11 @@ def _serialize_sample(sample: Any, load_resistance_ohm: float) -> dict[str, Any]
 
     timestamp = _timestamp_text(sample.received_at)
     return {
-        "id": sample.id,
         "schema_version": 1,
         "device_id": sample.device_id,
         "cell_id": sample.cell_id,
         "sequence": sample.sequence,
-        "uptime_ms": sample.uptime_ms,
         "timestamp": timestamp,
-        "received_at": timestamp,
         "electrical": {
             "voltage_mv": sample.bpv_voltage_mv,
             "current_ua": sample.current_ua,

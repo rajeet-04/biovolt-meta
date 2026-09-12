@@ -6,6 +6,11 @@ from biovolt_backend.config import Settings
 from biovolt_backend.main import create_app
 
 
+class FailingHealthRepository:
+    async def health_check(self) -> bool:
+        raise RuntimeError("database unavailable")
+
+
 def test_system_status_reports_connected_device_ids_and_telemetry_age(tmp_path) -> None:
     app = create_app(
         Settings(
@@ -36,3 +41,19 @@ def test_system_status_reports_connected_device_ids_and_telemetry_age(tmp_path) 
         "latest_telemetry_at": None,
         "latest_telemetry_age_ms": None,
     }
+
+
+def test_system_status_reports_database_error_when_health_check_fails(tmp_path) -> None:
+    app = create_app(
+        Settings(
+            environment="test",
+            database_url=f"sqlite+aiosqlite:///{tmp_path / 'status-failing.db'}",
+        )
+    )
+
+    with TestClient(app) as client:
+        client.app.state.telemetry_repository = FailingHealthRepository()
+        response = client.get("/api/system/status")
+
+    assert response.status_code == 200
+    assert response.json()["database"] == "error"

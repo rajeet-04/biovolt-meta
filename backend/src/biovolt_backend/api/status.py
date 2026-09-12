@@ -25,6 +25,10 @@ async def system_status(request: Request) -> dict[str, Any]:
 
     registry = request.app.state.device_registry
     connected_devices = registry.connected_device_ids()
+    try:
+        database_ok = await request.app.state.telemetry_repository.health_check()
+    except Exception:
+        database_ok = False
     now = datetime.now(UTC)
     devices: dict[str, dict[str, int | str | None]] = {}
     for device_id in connected_devices:
@@ -44,7 +48,7 @@ async def system_status(request: Request) -> dict[str, Any]:
 
     return {
         "backend": "ok",
-        "database": "ok" if getattr(request.app.state, "engine", None) is not None else "unknown",
+        "database": "ok" if database_ok else "error",
         "connected_devices": connected_devices,
         "device_count": len(connected_devices),
         "devices": devices,
