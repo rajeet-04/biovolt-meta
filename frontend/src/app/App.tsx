@@ -1,7 +1,9 @@
+import { AppSurface } from '../components/layout/AppSurface'
+
 export function App() {
   return (
-    <main>
+    <AppSurface>
       <h1>BioVolt</h1>
-    </main>
+    </AppSurface>
   )
 }
