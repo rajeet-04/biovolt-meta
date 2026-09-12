@@ -68,8 +68,9 @@ docker compose up -d backend
 ```
 
 Configure the ESP32 for `ws://<laptop-hotspot-ip>:8000/ws/device` with a unique
-device ID and the configured shared token. It must send the same Phase 0
-`device-telemetry.v1` JSON schema and use the same authentication headers:
+device ID and the configured shared token. Use that same ID in both the
+authentication header and the payload's top-level `device_id`; it must send the
+same Phase 0 `device-telemetry.v1` JSON schema and authentication headers:
 `X-BioVolt-Device-ID: <device_id>` and `Authorization: Bearer <shared-token>`.
 The backend route, scientific processing, database, and dashboard contract do
 not change. The switchover does not require a simulator install, a simulator

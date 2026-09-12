@@ -88,7 +88,8 @@ docker compose up -d backend
 
 Configure the ESP32 to connect to
 `ws://<laptop-hotspot-ip>:8000/ws/device` with a unique device ID and the
-configured shared token. It must send the same Phase 0
+configured shared token. Use that exact ID in both the authentication header
+and the payload's top-level `device_id`. It must send the same Phase 0
 `device-telemetry.v1` JSON shape and authentication headers:
 
 ```text

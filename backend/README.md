@@ -73,8 +73,9 @@ docker compose up -d backend
 
 Configure the ESP32 to connect to
 `ws://<laptop-hotspot-ip>:8000/ws/device` using a unique device ID and the
-configured shared token. Hardware uses the same `device-telemetry.v1` schema
-and authentication headers as the simulator:
+configured shared token. The ID must be identical in the authentication header
+and the payload's top-level `device_id`. Hardware uses the same
+`device-telemetry.v1` schema and authentication headers as the simulator:
 
 ```text
 X-BioVolt-Device-ID: <device_id>
