@@ -1,0 +1,1 @@
+export function QualityBadge({ eligible }: { eligible: boolean }) { return <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${eligible ? 'bg-emerald-950/50 text-emerald-200' : 'bg-amber-950/50 text-amber-200'}`}>{eligible ? 'Eligible comparison' : 'Comparison unavailable'}</span> }
