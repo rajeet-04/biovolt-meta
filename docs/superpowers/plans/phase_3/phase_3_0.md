@@ -4,36 +4,35 @@
 
 **Goal:** Replace the deterministic Python device simulator with a real ESP32 that acquires BioVolt sensors, maintains safe local actuator state, and streams the exact Phase 0 `device-telemetry.v1` contract to the unchanged Phase 1 backend every 500 ms under normal operation.
 
-**Architecture:** The ESP32 is implemented as a contract-compatible device client, not as a special backend mode. Sensor acquisition, safety/control scaffolding, actuator output, and telemetry/networking are separated into FreeRTOS tasks that exchange typed snapshots and queues. The backend and PWA remain source-neutral, so switching from simulator to ESP32 is an operational change only.
+**Architecture:** The ESP32 is a contract-compatible device client, not a special backend mode. Pure DTO, safety, validation, timing, and telemetry-serialization logic lives in `lib/BioVoltCore` so it is host-testable. ESP32-only sensor, actuator, NVS, serial, FreeRTOS, Wi-Fi, and WebSocket code lives in `src/`. Sensor, control, actuator, provisioning, and telemetry responsibilities run independently so a network stall cannot stop sensing or safety enforcement.
 
-**Tech Stack:** ESP32 DevKit V1 / ESP32-WROOM-32, PlatformIO, Arduino Framework, FreeRTOS, ArduinoJson 6.x, Adafruit ADS1X15, OneWire, DallasTemperature, BH1750, Links2004 WebSockets, ESP32 Preferences/NVS, PlatformIO Unity tests, existing FastAPI/PWA integration stack.
+**Tech Stack:** ESP32 DevKit V1 / ESP32-WROOM-32, PlatformIO, Arduino Framework, FreeRTOS, ArduinoJson 6.x, Adafruit ADS1X15, OneWire, DallasTemperature, BH1750, Links2004 WebSockets, ESP32 Preferences/NVS, PlatformIO Unity tests, existing FastAPI/PWA stack.
 
 **Spec:** `docs/architecture/software-architecture.md`
 
-**Depends on:** Phase 0 raw telemetry contract, Phase 1 authenticated `/ws/device` device boundary, Phase 1 simulator-to-hardware parity rule, and Phase 2 source-neutral PWA.
+**Depends on:** Phase 0 raw telemetry contract, Phase 1 authenticated `/ws/device` boundary and simulator-to-hardware parity rule, and Phase 2 source-neutral PWA.
 
 ## Global Constraints
 
-- The real ESP32 must use the same `WS /ws/device` endpoint used by the simulator.
-- The real ESP32 must use the same authentication headers: `X-BioVolt-Device-ID` and `Authorization: Bearer <shared-token>`.
-- The ESP32 must emit the exact Phase 0 `device-telemetry.v1` shape.
-- Raw firmware telemetry must never include `current_ua`, `power_uw`, `od680`, biomass, carbon, cumulative energy, or wall-clock server time.
-- FastAPI remains the owner of current, power, OD680, biomass, carbon, energy, persistence, and dashboard fanout.
-- Normal sensor and telemetry cadence is 500 ms, but the backend must tolerate real network jitter and dropped frames.
-- Sensor acquisition and actuator safety must continue if Wi-Fi, FastAPI, or the PWA is unavailable.
-- No telemetry replay/backfill is claimed in Phase 3. The device resumes live telemetry after reconnect and sequence gaps reveal missing frames.
-- `optimizer_direction` remains `0` in Phase 3. Perturb & Observe optimization is deliberately deferred to a later control phase.
-- Phase 3 boots in `monitor` mode with grow LED PWM `0` and mixer OFF unless an explicitly stored safe local configuration says otherwise.
-- Manual remote actuation, experiment lifecycle, adaptive optimization, calibration wizard writes, and operator PIN workflows remain out of Phase 3.
-- Secrets must not be committed or printed in serial logs.
-- Invalid/missing sensors produce protocol `null` values plus false health flags, never fake zero measurements.
-- GPIO outputs control MOSFET/relay/driver stages only. Grow lights, mixer motors/pumps, and probe LEDs are never powered directly from ESP32 GPIO pins.
+- Real ESP32 and simulator use the same `WS /ws/device`, auth headers, and `device-telemetry.v1` schema.
+- Raw firmware telemetry never contains `current_ua`, `power_uw`, `od680`, biomass, carbon, cumulative energy, or wall-clock server time.
+- FastAPI remains the owner of scientific derivations, persistence, cumulative energy, and dashboard fanout.
+- Normal sensing and telemetry cadence is 500 ms, while backend processing tolerates real Wi-Fi jitter and dropped frames.
+- Sensor acquisition and actuator safety continue if Wi-Fi, FastAPI, or the PWA is unavailable.
+- Phase 3 has no flash telemetry queue and makes no lossless-backfill claim. Unsent frames are discarded and sequence gaps expose missing observation periods.
+- `optimizer_direction` is always `0` in Phase 3. Perturb & Observe is deferred.
+- Phase 3 always boots in `monitor` mode with grow-light PWM `0` and mixer OFF. No stored runtime setting may bypass these boot-safe actuator states.
+- Remote actuation, experiment lifecycle, command acknowledgements, adaptive optimization, calibration-wizard writes, and operator PIN workflows are outside Phase 3.
+- Active runtime network/device configuration is immutable for a boot session. Serial provisioning edits a draft configuration, saves it to NVS, and applies it after reboot.
+- Secrets are never committed and never printed in clear text.
+- Invalid/missing sensors serialize as protocol `null` plus false health flags, never fake zero measurements.
+- GPIO outputs drive suitable MOSFET/relay/driver stages only. Loads are never powered directly from ESP32 GPIO.
 
 ---
 
 ## Recommended Board Mapping
 
-The plan uses these defaults in one compile-time board configuration file so wiring can be changed without touching driver logic:
+All defaults live in one `BoardConfig.h` and may be changed only after wiring review:
 
 ```text
 I2C SDA              GPIO 21
@@ -48,185 +47,130 @@ ADS1115 A0           BPV load-voltage channel
 ADS1115 A1           BPW34 optical receiver channel
 ```
 
-Hardware notes:
-- DS18B20 data requires the normal pull-up resistor to 3.3 V.
-- Grow LED, mixer, and 680 nm LED outputs must drive suitable transistor/MOSFET/relay stages.
-- Final wiring must be verified against the actual prototype before power is applied.
-- Pin/address values live in `BoardConfig.h`, not duplicated across drivers.
+Hardware requirements:
+- DS18B20 data uses the normal pull-up to 3.3 V.
+- Grow LED, mixer, and 680 nm probe LED use external driver stages.
+- ADS1115/BPW34 front-end input ranges are verified before power-up.
+- Required grounds and supply rails are documented in `docs/hardware/esp32-wiring.md` before HIL acceptance.
 
 ---
 
 ## Module Map
 
-### Module 3.1: PlatformIO Firmware Foundation and Testable Core
-Plan: `docs/superpowers/plans/phase_3/phase_3_1.md`
+### 3.1 PlatformIO Firmware Foundation and Testable Core
+`docs/superpowers/plans/phase_3/phase_3_1.md`
 
-Produces:
-- PlatformIO ESP32 project
-- native host-test environment for pure firmware logic
-- firmware boot skeleton
-- typed sensor/actuator/control DTOs
-- timing/backoff helpers
-- compile/test commands
+Produces PlatformIO `esp32dev` and `native` environments, pure DTOs, safe defaults, and deterministic reconnect helpers.
 
-### Module 3.2: Runtime Configuration, NVS, Secrets, and Serial Provisioning
-Plan: `docs/superpowers/plans/phase_3/phase_3_2.md`
+### 3.2 Runtime Configuration, NVS, Secrets, and Serial Provisioning
+`docs/superpowers/plans/phase_3/phase_3_2.md`
 
-Produces:
-- board configuration constants
-- runtime device/network configuration
-- Preferences/NVS persistence
-- ignored local secrets fallback
-- safe serial configuration CLI with secret redaction
+Produces board constants, host-testable `RuntimeConfig`, one versioned NVS config blob, ignored local secret fallback, redacted serial provisioning, and safe status diagnostics.
 
-### Module 3.3: Physical Sensor Acquisition
-Plan: `docs/superpowers/plans/phase_3/phase_3_3.md`
+### 3.3 Physical Sensor Acquisition
+`docs/superpowers/plans/phase_3/phase_3_3.md`
 
-Produces:
-- ADS1115 BPV acquisition
-- BPW34 optical acquisition with 680 nm probe pulse
-- asynchronous DS18B20 temperature acquisition
-- BH1750 light acquisition
-- explicit health/null semantics
-- 500 ms `SensorSnapshot`
+Produces ADS1115 BPV/BPW34 acquisition, asynchronous DS18B20, BH1750, pulsed 680 nm probe acquisition, and shared core `SensorFrame` health/null semantics.
 
-### Module 3.4: Actuator Drivers and Phase 3 Safety Baseline
-Plan: `docs/superpowers/plans/phase_3/phase_3_4.md`
+### 3.4 Actuator Drivers and Phase 3 Safety Baseline
+`docs/superpowers/plans/phase_3/phase_3_4.md`
 
-Produces:
-- grow-light PWM driver
-- mixer driver
-- hard boot-safe outputs
-- mixer max-runtime/cooldown enforcement
-- PWM clamping
-- `monitor`-mode baseline with optimizer disabled
+Produces boot-safe PWM/mixer drivers, host-tested safety policy, mixer runtime/cooldown enforcement, and non-adaptive Monitor baseline.
 
-### Module 3.5: FreeRTOS Runtime, State Exchange, and Task Isolation
-Plan: `docs/superpowers/plans/phase_3/phase_3_5.md`
+### 3.5 FreeRTOS Runtime, State Exchange, Task Isolation, and Provisioning Task
+`docs/superpowers/plans/phase_3/phase_3_5.md`
 
-Produces:
-- `SensorTask`
-- `ControlTask`
-- `ActuatorTask`
-- shared runtime-state store
-- one-slot actuator command queue
-- cadence tests/diagnostics
+Produces SensorTask, ControlTask, ActuatorTask, low-priority ProvisioningTask, one-slot actuator queue, and thread-safe runtime snapshots.
 
-### Module 3.6: Device Telemetry Serialization, Wi-Fi, and WebSocket Transport
-Plan: `docs/superpowers/plans/phase_3/phase_3_6.md`
+### 3.6 Device Telemetry Serialization, Wi-Fi, and WebSocket Transport
+`docs/superpowers/plans/phase_3/phase_3_6.md`
 
-Produces:
-- exact `device-telemetry.v1` serializer
-- sequence/uptime handling
-- Wi-Fi reconnect
-- authenticated `/ws/device` transport
-- bounded WebSocket reconnect backoff
-- no-replay live-resume behavior
-- source-neutral backend compatibility
+Produces host-tested core telemetry serializer, monotonic sequence/uptime, non-blocking Wi-Fi, authenticated `/ws/device`, bounded reconnect, and live-resume/no-replay behavior.
 
-### Module 3.7: Real-Hardware Backend/PWA Parity and Telemetry-Gap Safety
-Plan: `docs/superpowers/plans/phase_3/phase_3_7.md`
+### 3.7 Real-Hardware Backend/PWA Parity and Telemetry-Gap Safety
+`docs/superpowers/plans/phase_3/phase_3_7.md`
 
-Produces:
-- simulator-off / ESP32-on parity acceptance
-- backend regression for dropped-sequence energy discontinuities
-- real hardware visibility through `/api/system/status`
-- unchanged PWA live rendering
-- reconnect and sensor-fault integration checks
+Produces source-neutral continuity tracking, non-integrating energy anchors across sequence gaps, simulator-off/ESP32-on parity, and unchanged PWA rendering.
 
-### Module 3.8: Hardware-in-the-Loop Soak, CI, Wiring Docs, and Phase Acceptance
-Plan: `docs/superpowers/plans/phase_3/phase_3_8.md`
+### 3.8 Hardware-in-the-Loop Soak, CI, Wiring Docs, and Phase Acceptance
+`docs/superpowers/plans/phase_3/phase_3_8.md`
 
-Produces:
-- PlatformIO firmware CI
-- HIL smoke checklist
-- 30-minute real-device soak procedure
-- wiring/configuration documentation
-- phase acceptance evidence
+Produces firmware CI, wiring/pre-power docs, sensor fault tests, reconnect acceptance, and 30-minute real-device soak evidence.
 
 ---
 
 ## Mandatory Dependency Order
 
 ```text
-Phase 0 / Phase 1 / Phase 2 contracts ready
-                |
-                v
-3.1 PlatformIO + testable core
-                |
-                v
-3.2 Runtime configuration + provisioning
-                |
-                v
-3.3 Physical sensor acquisition
-                |
-                v
-3.4 Actuator safety baseline
-                |
-                v
-3.5 FreeRTOS runtime/task isolation
-                |
-                v
-3.6 Wi-Fi + device telemetry WebSocket
-                |
-                v
-3.7 Hardware parity + telemetry-gap safety
-                |
-                v
+Phase 0/1/2 interfaces ready
+        |
+        v
+3.1 PlatformIO + pure core
+        |
+        v
+3.2 Configuration + provisioning
+        |
+        v
+3.3 Physical sensors
+        |
+        v
+3.4 Actuator safety
+        |
+        v
+3.5 FreeRTOS task isolation
+        |
+        v
+3.6 Telemetry + Wi-Fi + WebSocket
+        |
+        v
+3.7 Hardware parity + gap-safe energy
+        |
+        v
 3.8 HIL soak + CI + acceptance
-                |
-                v
+        |
+        v
 Phase 3 complete
 ```
 
----
-
-## Firmware Runtime Data Flow
+## Runtime Data Flow
 
 ```text
-ADS1115 A0  BPV voltage ─┐
-ADS1115 A1  BPW34       ─┤
-DS18B20     temperature ─┤
-BH1750      lux         ─┘
-            |
-            v
-       SensorTask 500 ms
-            |
-            v
-       RuntimeState
-            |
-      +-----+------------------+
-      |                        |
-      v                        v
- ControlTask 500 ms      TelemetryTask
-      |                        |
-      v                        |
- Actuator queue                |
-      |                        |
-      v                        |
- ActuatorTask                  |
-                               v
-                     device-telemetry.v1
-                               |
-                               v
-                   authenticated /ws/device
-                               |
-                               v
-                            FastAPI
-                               |
-                        unchanged backend
-                               |
-                               v
-                         React PWA
+ADS1115 A0/A1 + DS18B20 + BH1750
+                |
+                v
+          SensorTask 500 ms
+                |
+                v
+         RuntimeStateStore
+            /          \
+           v            v
+ ControlTask 500 ms   TelemetryTask
+           |            |
+           v            v
+ actuator queue    device-telemetry.v1
+           |            |
+           v            v
+    ActuatorTask   authenticated /ws/device
+                        |
+                        v
+                     FastAPI
+                        |
+                        v
+                  unchanged PWA
+
+Serial USB
+   |
+   v
+ProvisioningTask -> draft config -> NVS config_v1 -> reboot required
 ```
 
-Phase 3 control behavior is intentionally conservative:
+Phase 3 control state is exact:
 
 ```text
 mode = monitor
 optimizer_direction = 0
-grow_led_pwm = safe configured value, default 0
-mixer_on = false unless locally requested through tested safety layer
+grow_led_pwm = 0
+mixer_on = false
 ```
 
 No P&O claim is made in this phase.
@@ -242,23 +186,23 @@ firmware/esp32/
 ├── include/
 │   ├── BoardConfig.h
 │   ├── BuildSecrets.example.h
-│   └── BuildSecrets.h              # ignored locally
+│   └── BuildSecrets.h                 # ignored locally
 ├── lib/
 │   └── BioVoltCore/
-│       ├── SensorTypes.h
-│       ├── RuntimeTypes.h
+│       ├── SensorTypes.h              # SensorValue, AnalogSample, SensorSnapshot, SensorHealth, SensorFrame
+│       ├── RuntimeTypes.h             # actuator/control/runtime snapshot DTOs
+│       ├── RuntimeConfig.h
+│       ├── ConfigValidation.h
 │       ├── Backoff.h
 │       ├── SafetyPolicy.h
-│       └── TelemetryModel.h
+│       ├── ControlBaseline.h
+│       ├── TelemetryModel.h
+│       ├── TelemetrySerializer.h
+│       └── TelemetrySerializer.cpp
 ├── src/
 │   ├── main.cpp
-│   ├── config/
-│   │   ├── RuntimeConfig.h
-│   │   ├── ConfigStore.h
-│   │   └── ConfigStore.cpp
-│   ├── provisioning/
-│   │   ├── SerialProvisioner.h
-│   │   └── SerialProvisioner.cpp
+│   ├── config/ConfigStore.h/.cpp
+│   ├── provisioning/SerialProvisioner.h/.cpp
 │   ├── sensors/
 │   │   ├── Ads1115Sampler.h/.cpp
 │   │   ├── OpticalProbe.h/.cpp
@@ -273,83 +217,59 @@ firmware/esp32/
 │   │   ├── RuntimeStateStore.h/.cpp
 │   │   ├── SensorTask.h/.cpp
 │   │   ├── ControlTask.h/.cpp
-│   │   └── ActuatorTask.h/.cpp
-│   ├── telemetry/
-│   │   ├── TelemetrySerializer.h/.cpp
-│   │   └── TelemetryTask.h/.cpp
+│   │   ├── ActuatorTask.h/.cpp
+│   │   └── ProvisioningTask.h/.cpp
+│   ├── telemetry/TelemetryTask.h/.cpp
 │   └── network/
 │       ├── NetworkManager.h/.cpp
 │       └── DeviceWebSocket.h/.cpp
 └── test/
+    ├── test_core_types/
     ├── test_core_backoff/
     ├── test_core_safety/
-    ├── test_telemetry_model/
-    └── test_config_validation/
+    ├── test_control_baseline/
+    ├── test_config_validation/
+    └── test_telemetry_model/
 ```
+
+Anything executed by the `native` test environment must live under `lib/BioVoltCore`, not under ESP32-only `src/`.
 
 ---
 
-## Phase 3 Telemetry Rules
+## Raw Telemetry Rules
 
-A normal real-device frame must contain exactly:
+A real-device frame contains exactly the Phase 0 groups and fields:
 
 ```text
-schema_version
-device_id
-sequence
-uptime_ms
-cell_id
+schema_version, device_id, sequence, uptime_ms, cell_id
 
-electrical
-  bpv_voltage_mv
-  bpv_adc_raw
-
-optical
-  bpw34_raw
-  bpw34_voltage_mv
-  led_680_enabled
-
-environment
-  temperature_c
-  lux
-
-actuators
-  grow_led_pwm
-  mixer_on
-
-control
-  mode
-  optimizer_direction
-
-health
-  ads1115_ok
-  bpw34_ok
-  temperature_ok
-  light_sensor_ok
+electrical: bpv_voltage_mv, bpv_adc_raw
+optical: bpw34_raw, bpw34_voltage_mv, led_680_enabled
+environment: temperature_c, lux
+actuators: grow_led_pwm, mixer_on
+control: mode, optimizer_direction
+health: ads1115_ok, bpw34_ok, temperature_ok, light_sensor_ok
 ```
 
-The 680 nm flag means **the probe LED state at the instant the BPW34 sample was acquired**. It is not a claim that the probe LED stays on continuously after acquisition.
-
-`bpw34_ok` means the optical acquisition path/channel was successfully read. It does not prove the optical calibration is valid and does not itself prove the photodiode is biologically meaningful.
+`led_680_enabled` is the probe LED state **at the instant the BPW34 sample was acquired**, not a continuous-output claim. `bpw34_ok` means the optical acquisition path was successfully read; it does not assert valid calibration or biological interpretation.
 
 ---
 
 ## Network Loss Policy
 
-During Wi-Fi/backend outage:
-
 ```text
-Sensors continue
-Safety/control scaffolding continues
-Actuator safety continues
-No flash telemetry queue is written
-No old frames are replayed later
-Sequence continues advancing at telemetry ticks
-WebSocket reconnect uses bounded backoff
-Live transmission resumes on reconnect
+sensing continues
+control/safety continues
+actuator timeout enforcement continues
+serial provisioning remains available
+no flash telemetry queue
+no stale-frame replay
+sequence advances at scheduled telemetry ticks
+Wi-Fi/WebSocket reconnect with bounded backoff
+live state resumes after reconnect
 ```
 
-This intentionally favors system safety and protocol simplicity over pretending Phase 3 has lossless logging. Sequence gaps allow FastAPI to identify missing telemetry periods.
+A backend continuity tracker in Module 3.7 treats sequence gaps as unobserved intervals and does not integrate energy across them.
 
 ---
 
@@ -361,39 +281,32 @@ This intentionally favors system safety and protocol simplicity over pretending 
 4. `feat: add ESP32 actuator safety baseline`
 5. `feat: run BioVolt firmware with isolated FreeRTOS tasks`
 6. `feat: stream real ESP32 telemetry to BioVolt backend`
-7. `test: enforce real hardware telemetry continuity semantics`
+7. `fix: treat real telemetry gaps as energy discontinuities`
 8. `test: add ESP32 hardware soak CI and acceptance docs`
-
-Each implementation checkpoint must pass every test introduced so far before continuing.
-
----
 
 ## Phase 3 Exit Criteria
 
-- [ ] ESP32 firmware compiles reproducibly with PlatformIO.
-- [ ] Local secrets are ignored and never printed.
-- [ ] Device identity, cell identity, Wi-Fi, backend target, and token can be configured without editing driver code.
-- [ ] ESP32 boots with grow-light and mixer outputs in safe states.
-- [ ] ADS1115 A0 produces BPV raw count and millivolt telemetry.
-- [ ] ADS1115 A1 produces BPW34 raw count and millivolt telemetry under a 680 nm probe pulse.
-- [ ] DS18B20 acquisition does not block the 500 ms task cycle with a 750 ms conversion.
-- [ ] BH1750 provides lux or explicit null/false health.
-- [ ] Missing sensors do not prevent remaining sensors/network from operating.
-- [ ] SensorTask cadence is approximately 500 ms without `delay(500)` drift accumulation.
-- [ ] ControlTask runs separately and keeps `optimizer_direction=0` in Phase 3.
-- [ ] ActuatorTask enforces PWM bounds, mixer max runtime, and mixer cooldown.
-- [ ] Real firmware serializer matches `device-telemetry.v1` and contains no backend-derived values.
-- [ ] Uptime uses a monotonic 64-bit ESP32 time source.
-- [ ] Sequence advances once per scheduled telemetry frame.
-- [ ] Wi-Fi/backend outages do not stop sensing/safety tasks.
-- [ ] Device reconnects without reboot after backend/Wi-Fi recovery.
-- [ ] Simulator can be stopped and real ESP32 appears through the unchanged `/ws/device` path.
-- [ ] `/api/system/status` shows the real device ID.
-- [ ] Existing Phase 2 PWA displays real hardware telemetry without a source-specific frontend rebuild.
-- [ ] A dropped telemetry gap does not cause FastAPI to integrate energy across an unobserved interval.
-- [ ] 30-minute real-device soak passes without firmware reset, runaway actuator, or backend crash.
-- [ ] Phase 0 contract tests, Phase 1 backend tests, Phase 2 frontend tests, and firmware compile/tests remain green.
+- [ ] ESP32 firmware compiles reproducibly and native core tests pass.
+- [ ] Local secrets are ignored and redacted from logs.
+- [ ] Runtime config can be provisioned without editing drivers; saved changes apply after reboot.
+- [ ] ESP32 always boots grow LED PWM 0 and mixer OFF.
+- [ ] ADS1115 A0/A1 produce raw count and mV telemetry when connected.
+- [ ] DS18B20 is asynchronous and does not stall the 500 ms sensor schedule.
+- [ ] BH1750 returns lux or explicit null/false health.
+- [ ] Missing sensors do not stop remaining sensing/network tasks.
+- [ ] SensorTask and ControlTask run approximately every 500 ms without cumulative `delay(500)` drift.
+- [ ] ActuatorTask enforces PWM bounds, mixer max runtime, and cooldown.
+- [ ] Provisioning remains usable after the main FreeRTOS runtime starts.
+- [ ] Real serializer matches `device-telemetry.v1` and contains no backend-derived values.
+- [ ] Uptime uses monotonic 64-bit ESP32 time; sequence advances once per scheduled frame.
+- [ ] Wi-Fi/backend outages do not stop sensing/safety and do not require ESP32 reboot.
+- [ ] Simulator can be stopped and real ESP32 appears through unchanged `/ws/device`.
+- [ ] `/api/system/status` shows the configured real device ID.
+- [ ] Existing Phase 2 PWA displays real hardware telemetry without a source-specific rebuild.
+- [ ] Dropped telemetry gaps do not cause FastAPI to integrate energy across unobserved intervals.
+- [ ] 30-minute real-device soak passes without unexpected reset, runaway actuator, backend crash, or progressive memory collapse.
+- [ ] Phase 0 contract, Phase 1 backend, Phase 2 frontend, and firmware regression suites remain green.
 
 ## Handoff to Phase 4
 
-Phase 4 should add the **experiment/control command path** on top of the proven physical device: backend experiment lifecycle, `device-command.v1` delivery/acknowledgement, Passive/Manual operating workflows, and operator-protected controls. Adaptive P&O remains a later phase until the command and experiment substrate is reliable.
+Phase 4 should add the experiment/control command substrate on top of this proven physical path: backend experiment lifecycle, `device-command.v1` delivery plus acknowledgement, Passive/Manual workflows, and operator-protected controls. Adaptive P&O remains later until command delivery and experiments are reliable.
