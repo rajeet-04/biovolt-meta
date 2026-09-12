@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-2026-001",
+  "name": "Passive baseline",
+  "cell_id": "cell-a",
+  "mode": "passive",
+  "calibration_profile_id": "cal-001",
+  "configuration": {
+    "grow_led_pwm": 120,
+    "mixer_interval_s": 300,
+    "mixer_duration_s": 5
+  },
+  "notes": "Baseline run before adaptive control."
+}

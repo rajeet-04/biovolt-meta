@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "event_id": "evt-00042",
+  "timestamp": "2026-08-23T17:42:01+05:30",
+  "device_id": "biovolt-01",
+  "cell_id": "cell-a",
+  "type": "optimizer_step",
+  "data": {
+    "previous_pwm": 120,
+    "new_pwm": 128,
+    "previous_power_uw": 1.71,
+    "current_power_uw": 1.83,
+    "decision": "continue"
+  }
+}

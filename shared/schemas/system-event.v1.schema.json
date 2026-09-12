@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://biovolt.local/schemas/system-event.v1.schema.json",
+  "title": "BioVolt System Event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "timestamp",
+    "device_id",
+    "cell_id",
+    "type",
+    "data"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "event_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "device_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "cell_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "type": {
+      "type": "string",
+      "enum": [
+        "device_connected",
+        "device_disconnected",
+        "sensor_fault",
+        "sensor_recovered",
+        "experiment_started",
+        "experiment_stopped",
+        "optimizer_step",
+        "safety_override",
+        "mixer_activated",
+        "calibration_changed"
+      ]
+    },
+    "data": {"type": "object"}
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "command_id": "cmd-01783",
+  "type": "set_led_pwm",
+  "payload": {
+    "value": 130
+  }
+}

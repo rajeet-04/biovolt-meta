@@ -75,3 +75,5 @@ Phase 0 defines a linear calibration model:
 `co2_biofixed_g = max(biomass_delta_g, 0) * 1.83`
 
 This value is an estimated amount of CO2 biofixed into biomass. It is not direct gas-phase CO2 measurement and not a permanent sequestration claim.
+
+Calibration values in canonical examples demonstrate contract structure only. They are not universal biological constants and must not be copied into experiments without calibration of the actual cell and reactor.

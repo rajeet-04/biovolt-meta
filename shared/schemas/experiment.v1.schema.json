@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://biovolt.local/schemas/experiment.v1.schema.json",
+  "title": "BioVolt Experiment Definition v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "experiment_id",
+    "name",
+    "cell_id",
+    "mode",
+    "calibration_profile_id",
+    "configuration",
+    "notes"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "experiment_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "name": {"type": "string", "minLength": 1, "maxLength": 120},
+    "cell_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "mode": {
+      "type": "string",
+      "enum": ["monitor", "passive", "adaptive", "manual"]
+    },
+    "calibration_profile_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["grow_led_pwm", "mixer_interval_s", "mixer_duration_s"],
+      "properties": {
+        "grow_led_pwm": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 255
+        },
+        "mixer_interval_s": {"type": ["integer", "null"], "minimum": 0},
+        "mixer_duration_s": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "notes": {"type": "string", "maxLength": 1000}
+  }
+}

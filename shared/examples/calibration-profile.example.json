@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "profile_id": "cal-001",
+  "cell_id": "cell-a",
+  "electrical": {
+    "load_resistance_ohm": 100000,
+    "ads1115_offset_mv": -0.42
+  },
+  "optical": {
+    "bpw34_dark_raw": 320,
+    "bpw34_blank_raw": 23840
+  },
+  "biomass": {
+    "model": "linear",
+    "slope": 0.501,
+    "intercept": 0.012
+  },
+  "reactor": {
+    "volume_l": 0.25
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://biovolt.local/schemas/calibration-profile.v1.schema.json",
+  "title": "BioVolt Calibration Profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile_id",
+    "cell_id",
+    "electrical",
+    "optical",
+    "biomass",
+    "reactor"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "profile_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "cell_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "electrical": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["load_resistance_ohm", "ads1115_offset_mv"],
+      "properties": {
+        "load_resistance_ohm": {"type": "number", "exclusiveMinimum": 0},
+        "ads1115_offset_mv": {"type": "number"}
+      }
+    },
+    "optical": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bpw34_dark_raw", "bpw34_blank_raw"],
+      "properties": {
+        "bpw34_dark_raw": {"type": "integer"},
+        "bpw34_blank_raw": {"type": "integer"}
+      }
+    },
+    "biomass": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "slope", "intercept"],
+      "properties": {
+        "model": {"const": "linear"},
+        "slope": {"type": "number", "exclusiveMinimum": 0},
+        "intercept": {"type": "number"}
+      }
+    },
+    "reactor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["volume_l"],
+      "properties": {
+        "volume_l": {"type": "number", "exclusiveMinimum": 0}
+      }
+    }
+  }
+}
