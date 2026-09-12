@@ -6,6 +6,8 @@ REQUIRED_FILES = [
     "README.md",
     ".gitignore",
     ".editorconfig",
+    "pyproject.toml",
+    "uv.lock",
     "backend/README.md",
     "firmware/esp32/README.md",
     "frontend/README.md",
@@ -16,7 +18,6 @@ REQUIRED_FILES = [
 ]
 
 REQUIRED_FILES += [
-    "requirements-contracts.txt",
     "scripts/validate_schemas.py",
     ".github/workflows/contracts.yml",
     "shared/schemas/device-telemetry.v1.schema.json",
@@ -34,11 +35,13 @@ REQUIRED_FILES += [
 ]
 
 FORBIDDEN_PHASE_ZERO_FILES = [
-    # Docker Compose is introduced by Phase 1.6; retain the remaining
-    # runtime-entrypoint guards for Phase 0 repository completeness.
+    # Docker Compose was introduced by Phase 1.6 and removed from this list at
+    # that time. The frontend package manifest was introduced by Phase 2.1 and
+    # removed from this list as part of Phase 2.7 verification. The ESP32
+    # PlatformIO project was introduced by Phase 3.1 and removed from this
+    # list as part of Phase 3.1 verification. A top-level backend main
+    # module remains forbidden until its owning phase lands.
     "backend/app/main.py",
-    "frontend/package.json",
-    "firmware/esp32/platformio.ini",
 ]
 
 

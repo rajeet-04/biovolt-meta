@@ -22,6 +22,7 @@ dist/
 
 # Future PlatformIO
 .pio/
+firmware/esp32/include/BuildSecrets.h
 
 # Runtime data
 data/*.db
@@ -32,3 +33,15 @@ data/exports/
 # Coverage
 .coverage
 htmlcov/
+
+# Superpowers SDD scratch
+.superpowers/
+
+# Git worktrees
+.worktrees/
+worktrees/
+
+# Python build artifacts
+*.egg-info/
+build/
+dist-*/

@@ -25,6 +25,22 @@ Phase 2.1: frontend foundation and application shell. Backend, simulator,
 persistence, and integration work from Phase 1 remain available for local
 development; frontend backend integration begins in Phase 2.2.
 
+## Development Setup
+
+The Python workspace and the frontend each use a single lockfile managed by
+[uv](https://docs.astral.sh/uv/) and [bun](https://bun.sh/) respectively. After
+installing both tools, prepare the local environment from the repository root:
+
+```bash
+uv sync --all-extras --dev
+bun install --frozen-lockfile
+```
+
+The Python workspace (`pyproject.toml` + `uv.lock` at the repo root) covers
+the contract tooling and the `backend` and `simulator` workspace members.
+The frontend (`frontend/package.json` + `frontend/bun.lock`) is independent
+and installed into `frontend/node_modules`.
+
 ## Frontend Development
 
 The Phase 2.1 frontend is a shell-only React/Vite application. Start it from
@@ -32,18 +48,18 @@ the repository root with:
 
 ```bash
 cd frontend
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
 Run its lint, strict typecheck, tests, and production build before handing off
 frontend changes:
 
 ```bash
-npm run lint
-npm run typecheck
-npm run test:run
-npm run build
+bun run lint
+bun run typecheck
+bun run test:run
+bun run build
 ```
 
 This phase does not connect the frontend to FastAPI or calculate telemetry;
@@ -77,6 +93,19 @@ docker compose --profile simulator up --build -d
 curl http://localhost:8000/api/system/status
 ```
 
+The React PWA preview is opt-in through the `frontend` profile. It builds the
+`frontend/Dockerfile` preview server, depends on a healthy backend, and serves
+on `http://localhost:4173`. The frontend itself does not require
+`BIOVOLT_DEVICE_SHARED_TOKEN`; the token is only used by the backend when
+accepting device connections. Start the backend and PWA together with:
+
+```bash
+docker compose --profile frontend up --build -d
+```
+
+Add `--profile simulator` to bring the simulator online alongside the PWA
+without restarting the frontend.
+
 The optional `BIOVOLT_BPW34_DARK_RAW` and `BIOVOLT_BPW34_BLANK_RAW` settings
 should remain commented out when unused. Compose passes those values only when
 they are defined, avoiding blank strings that strict Pydantic float settings
@@ -101,6 +130,12 @@ same Phase 0 `device-telemetry.v1` JSON schema and authentication headers:
 The backend route, scientific processing, database, and dashboard contract do
 not change. The switchover does not require a simulator install, a simulator
 container in the demo, feature flags, or a second telemetry table.
+
+## Phase 2 PWA acceptance checks
+
+With the PWA preview serving on `http://localhost:4173`, follow the operator
+checklist in [`scripts/phase2_smoke.md`](scripts/phase2_smoke.md) to verify
+live telemetry, simulator removal, and offline/installed-PWA behavior.
 
 ## Phase 1 acceptance checks
 
