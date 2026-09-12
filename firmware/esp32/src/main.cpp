@@ -8,6 +8,7 @@
 #include "actuators/ActuatorController.h"
 #include "runtime/ActuatorTask.h"
 #include "runtime/ControlTask.h"
+#include "runtime/CommandTask.h"
 #include "runtime/ProvisioningTask.h"
 #include "runtime/RuntimeStateStore.h"
 #include "runtime/SensorTask.h"
@@ -41,9 +42,11 @@ RuntimeStateStore runtimeState;
 NetworkManager networkManager;
 DeviceWebSocket deviceWebSocket;
 QueueHandle_t actuatorQueue = nullptr;
+QueueHandle_t commandQueue = nullptr;
 SensorTaskContext sensorTaskContext{&sensorManager, &runtimeState};
 ControlTaskContext controlTaskContext{&runtimeState, nullptr};
 ActuatorTaskContext actuatorTaskContext{&actuatorController, &runtimeState, nullptr};
+CommandTaskContext commandTaskContext{&actuatorController, &runtimeState, &deviceWebSocket, nullptr};
 ProvisioningTaskContext provisioningTaskContext{&provisioner};
 TelemetryTaskContext telemetryTaskContext{&runtimeState, &networkManager, &deviceWebSocket, &activeConfig};
 
@@ -87,14 +90,17 @@ void setup() {
   sensorManager.begin();
   const bool stateReady = runtimeState.begin();
   actuatorQueue = xQueueCreate(1, sizeof(ActuatorRequest));
+  commandQueue = xQueueCreate(8, sizeof(CommandQueueItem));
   controlTaskContext.actuatorQueue = actuatorQueue;
   actuatorTaskContext.actuatorQueue = actuatorQueue;
+  commandTaskContext.commandQueue = commandQueue;
+  deviceWebSocket.setCommandQueue(commandQueue);
 
   if (!validateRuntimeConfig(activeConfig).valid) {
     Serial.println("Configuration invalid; actuators remain off and serial provisioning is available");
   }
 
-  if (!stateReady || !actuatorQueue) {
+  if (!stateReady || !actuatorQueue || !commandQueue) {
     Serial.println("Runtime state or actuator queue unavailable; outputs remain safe");
     setActuatorsSafe();
     return;
@@ -105,11 +111,14 @@ void setup() {
                                                           &controlTaskContext, 3, nullptr, 1);
   const BaseType_t actuatorTask = xTaskCreatePinnedToCore(actuatorTaskEntry, "actuator", 3072,
                                                            &actuatorTaskContext, 3, nullptr, 1);
+  const BaseType_t commandTask = xTaskCreatePinnedToCore(commandTaskEntry, "command", 4096,
+                                                          &commandTaskContext, 3, nullptr, 1);
   const BaseType_t provisioningTask = xTaskCreate(provisioningTaskEntry, "provision", 3072,
                                                   &provisioningTaskContext, 1, nullptr);
   const BaseType_t telemetryTask = xTaskCreatePinnedToCore(telemetryTaskEntry, "telemetry", 6144,
                                                             &telemetryTaskContext, 2, nullptr, 1);
   if (sensorTask != pdPASS || controlTask != pdPASS || actuatorTask != pdPASS ||
+      commandTask != pdPASS ||
       provisioningTask != pdPASS || telemetryTask != pdPASS) {
     Serial.println("Runtime task creation failed; outputs remain safe");
     setActuatorsSafe();
