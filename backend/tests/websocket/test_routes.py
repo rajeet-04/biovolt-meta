@@ -7,7 +7,11 @@ from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from biovolt_backend.config import Settings
+from biovolt_backend.domain.energy import EnergyAccumulator
+from biovolt_backend.domain.processing import ProcessingConfig
 from biovolt_backend.main import create_app
+from biovolt_backend.persistence.throttle import PersistenceThrottle
+from biovolt_backend.services.telemetry_service import TelemetryService
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEVICE_TOKEN = "test-token-123"
@@ -172,6 +176,47 @@ def test_storage_unsafe_integer_frame_returns_error_and_connection_continues(tmp
                     assert device.receive_json() == {"error": "invalid telemetry frame"}
 
                 device.send_json(canonical_payload())
+                assert dashboard.receive_json()["sequence"] == 1245
+
+
+def test_non_finite_derived_electrical_frame_returns_error_and_continues(tmp_path) -> None:
+    app = create_app(
+        Settings(
+            environment="test",
+            database_url=f"sqlite+aiosqlite:///{tmp_path / 'routes.db'}",
+            device_shared_token=DEVICE_TOKEN,
+        )
+    )
+    overflowing = canonical_payload()
+    overflowing["electrical"]["bpv_voltage_mv"] = 1.0  # type: ignore[index]
+
+    with TestClient(app) as client:
+        app.state.telemetry_service = TelemetryService(
+            config=ProcessingConfig(
+                load_resistance_ohm=1e-306,
+                bpw34_dark_raw=320,
+                bpw34_blank_raw=23_840,
+            ),
+            energy=EnergyAccumulator(),
+            throttle=PersistenceThrottle(),
+            repository=app.state.telemetry_repository,
+            dashboard_hub=app.state.dashboard_hub,
+            device_registry=app.state.device_registry,
+        )
+        with client.websocket_connect("/ws/dashboard") as dashboard:
+            with client.websocket_connect(
+                "/ws/device",
+                headers={
+                    "X-BioVolt-Device-ID": DEVICE_ID,
+                    "Authorization": f"Bearer {DEVICE_TOKEN}",
+                },
+            ) as device:
+                device.send_json(overflowing)
+                assert device.receive_json() == {"error": "invalid telemetry frame"}
+
+                valid = canonical_payload()
+                valid["electrical"]["bpv_voltage_mv"] = 0.0  # type: ignore[index]
+                device.send_json(valid)
                 assert dashboard.receive_json()["sequence"] == 1245
 
 

@@ -9,7 +9,7 @@ from pydantic import ValidationError as PydanticValidationError
 
 from biovolt_backend.contracts.loader import validate_payload
 from biovolt_backend.contracts.models import DeviceTelemetryV1, ProcessedTelemetryV1
-from biovolt_backend.domain.electrical import power_uw
+from biovolt_backend.domain.electrical import current_ua, power_uw
 from biovolt_backend.domain.energy import EnergyAccumulator
 from biovolt_backend.domain.processing import ProcessingConfig, build_processed_telemetry
 from biovolt_backend.persistence.telemetry_repository import TelemetryRepository
@@ -47,6 +47,18 @@ def _safe_power_uw(voltage_mv: float, resistance_ohm: float) -> float:
     if not math.isfinite(power):
         raise TelemetryRejected("telemetry calculation overflow")
     return power
+
+
+def _safe_electrical_values(voltage_mv: float, resistance_ohm: float) -> tuple[float, float]:
+    """Validate both electrical derivatives before energy state is updated."""
+
+    try:
+        current = current_ua(voltage_mv, resistance_ohm)
+    except OverflowError as exc:
+        raise TelemetryRejected("non-finite derived electrical value") from exc
+    if not math.isfinite(current):
+        raise TelemetryRejected("non-finite derived electrical value")
+    return current, _safe_power_uw(voltage_mv, resistance_ohm)
 
 
 def _ensure_storage_safe_integers(raw: DeviceTelemetryV1) -> None:
@@ -99,10 +111,10 @@ class TelemetryService:
         _ensure_storage_safe_integers(raw)
 
         voltage_mv = raw.electrical.bpv_voltage_mv
-        measured_power_uw = (
-            _safe_power_uw(voltage_mv, self._config.load_resistance_ohm)
+        _, measured_power_uw = (
+            _safe_electrical_values(voltage_mv, self._config.load_resistance_ohm)
             if voltage_mv is not None
-            else None
+            else (None, None)
         )
         try:
             energy_mj = self._energy.update(

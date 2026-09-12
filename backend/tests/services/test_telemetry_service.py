@@ -88,6 +88,7 @@ def service_with_fakes(
     events: list[str],
     *,
     allowed: bool = True,
+    config: ProcessingConfig | None = None,
 ) -> tuple[TelemetryService, FakeEnergy, FakeThrottle, FakeRepository, FakeHub, FakeRegistry]:
     energy = FakeEnergy(events)
     throttle = FakeThrottle(events, allowed=allowed)
@@ -95,7 +96,8 @@ def service_with_fakes(
     hub = FakeHub(events)
     registry = FakeRegistry(events)
     service = TelemetryService(
-        config=ProcessingConfig(
+        config=config
+        or ProcessingConfig(
             load_resistance_ohm=100_000.0,
             bpw34_dark_raw=320,
             bpw34_blank_raw=23_840,
@@ -345,3 +347,33 @@ async def test_handle_raw_rejects_cumulative_energy_overflow_without_poisoning_s
     assert len(repository.calls) == repository_count + 1
     assert len(hub.payloads) == broadcast_count + 1
     assert len(registry.calls) == registry_count + 1
+
+
+async def test_handle_raw_rejects_non_finite_derived_electrical_values_before_side_effects() -> (
+    None
+):
+    events: list[str] = []
+    service, energy, throttle, repository, hub, registry = service_with_fakes(
+        events,
+        config=ProcessingConfig(
+            load_resistance_ohm=1e-306,
+            bpw34_dark_raw=320,
+            bpw34_blank_raw=23_840,
+        ),
+    )
+    payload = canonical_payload()
+    payload["electrical"]["bpv_voltage_mv"] = 1.0  # type: ignore[index]
+
+    with pytest.raises(TelemetryRejected, match="non-finite derived electrical value"):
+        await service.handle_raw(
+            payload,
+            "biovolt-01",
+            datetime(2026, 8, 23, 12, 0, tzinfo=UTC),
+        )
+
+    assert events == []
+    assert energy.calls == []
+    assert throttle.calls == []
+    assert repository.calls == []
+    assert hub.payloads == []
+    assert registry.calls == []
