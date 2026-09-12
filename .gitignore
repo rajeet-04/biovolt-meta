@@ -32,3 +32,6 @@ data/exports/
 # Coverage
 .coverage
 htmlcov/
+
+# Superpowers SDD scratch
+.superpowers/
