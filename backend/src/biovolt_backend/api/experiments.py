@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 from fastapi import APIRouter, Depends, Request
 
 from biovolt_backend.experiments.schemas import ExperimentCreate, ExperimentDraftUpdate
@@ -53,3 +54,11 @@ async def stop(request: Request, experiment_id: str):
 @router.post("/{experiment_id}/abort", dependencies=[Depends(require_operator_session)])
 async def abort(request: Request, experiment_id: str):
     return await service(request).abort(experiment_id)
+
+
+@router.post(
+    "/{experiment_id}/arms/{arm_id}/baseline/capture",
+    dependencies=[Depends(require_operator_session)],
+)
+async def capture_baseline(request: Request, experiment_id: str, arm_id: str):
+    return await request.app.state.baseline_service.capture(experiment_id, arm_id)

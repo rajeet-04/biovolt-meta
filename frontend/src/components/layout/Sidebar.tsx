@@ -12,6 +12,7 @@ const links = [
   { label: 'System', to: '/system' },
   { label: 'Experiments', to: '/experiments' },
   { label: 'Control', to: '/control' },
+  { label: 'Calibration', to: '/calibration' },
 ]
 
 export function Sidebar({ isOpen, onNavigate }: SidebarProps) {

@@ -18,6 +18,7 @@ from biovolt_backend.config import Settings
 from biovolt_backend.domain.continuity import TelemetryContinuityTracker
 from biovolt_backend.domain.energy import EnergyAccumulator
 from biovolt_backend.domain.processing import ProcessingConfig
+from biovolt_backend.experiments.baseline import BaselineService
 from biovolt_backend.experiments.orchestrator import ExperimentOrchestrator
 from biovolt_backend.experiments.repository import ExperimentRepository
 from biovolt_backend.experiments.service import ExperimentService
@@ -45,6 +46,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.session_factory = session_factory
         app.state.telemetry_repository = TelemetryRepository(session_factory)
         app.state.calibration_service = CalibrationService(session_factory)
+        app.state.baseline_service = BaselineService(session_factory)
         app.state.experiment_service = ExperimentService(ExperimentRepository(session_factory))
         app.state.device_registry = DeviceRegistry()
         app.state.command_service = CommandService(CommandRepository(session_factory))

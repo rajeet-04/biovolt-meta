@@ -1,4 +1,5 @@
 """SQLAlchemy models for persisted experiments and arms."""
+# ruff: noqa: E501
 
 from datetime import datetime
 
@@ -39,4 +40,12 @@ class ExperimentArm(Base):
     initial_led_pwm: Mapped[int] = mapped_column(Integer, nullable=False)
     initial_mixer_on: Mapped[bool] = mapped_column(Boolean, nullable=False)
     label: Mapped[str | None] = mapped_column(String(128))
+    calibration_revision_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    baseline_telemetry_sample_id: Mapped[int | None] = mapped_column(
+        ForeignKey("telemetry_samples.id"), nullable=True
+    )
+    baseline_sequence: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    baseline_timestamp: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    baseline_biomass_g_l: Mapped[float | None] = mapped_column(nullable=True)
+    baseline_dry_biomass_g: Mapped[float | None] = mapped_column(nullable=True)
     experiment: Mapped[Experiment] = relationship(back_populates="arms")

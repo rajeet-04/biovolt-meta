@@ -1,0 +1,5 @@
+export interface BiomassPoint { od680: number; dry_biomass_g_l: number }
+export interface CalibrationRevision { id: string; profile_id: string; revision_number: number; validation: Record<string, string>; biomass_slope: number | null; biomass_intercept: number | null; biomass_r_squared: number | null; biomass_rmse_g_l: number | null; biomass_point_count: number | null }
+export interface CalibrationProfile { id: string; name: string; description: string | null; active_revision_id: string | null; revisions: CalibrationRevision[] }
+export interface CalibrationDraft { name: string; description?: string; load_resistance_ohm: number; ads1115_offset_mv: number; optical_dark_raw: number | null; optical_blank_raw: number | null; biomass_points: BiomassPoint[]; reactor_volume_l: number | null; co2_per_dry_biomass_g_per_g: number | null; source_notes?: string }
+export interface CalibrationCapture { device_id: string; cell_id: string; sequence: number; server_timestamp: string; age_ms: number; bpv_voltage_mv: number | null; bpv_adc_raw: number | null; bpw34_raw: number | null; bpw34_voltage_mv: number | null; sensor_health: Record<string, boolean> }
