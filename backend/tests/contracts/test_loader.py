@@ -20,3 +20,14 @@ def test_device_payload_without_sequence_is_rejected():
     }
     with pytest.raises(ValidationError):
         validate_payload("device-telemetry.v1.schema.json", payload)
+
+
+def test_processed_payload_with_invalid_timestamp_is_rejected():
+    repo = Path(__file__).resolve().parents[3]
+    payload = json.loads(
+        (repo / "shared/examples/processed-telemetry.example.json").read_text(encoding="utf-8")
+    )
+    payload["timestamp"] = "not-a-date-time"
+
+    with pytest.raises(ValidationError):
+        validate_payload("processed-telemetry.v1.schema.json", payload)
