@@ -2,25 +2,27 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make the real ESP32 configurable for laptop hotspot, backend target, device identity, and safety limits without hard-coding operational values into sensor/network drivers.
+**Goal:** Configure the real ESP32 for laptop hotspot, backend target, device identity, and actuator safety limits without hard-coding operational values into drivers, while keeping secrets redacted and configuration changes deterministic.
 
-**Architecture:** Compile-time board wiring lives in `BoardConfig.h`. Runtime connection/device settings live in a typed `RuntimeConfig`, persist in ESP32 Preferences/NVS, and may fall back to a local ignored `BuildSecrets.h` on first boot. A serial provisioning CLI provides hackathon-friendly reconfiguration without reflashing while redacting credentials.
+**Architecture:** Compile-time board wiring lives in `BoardConfig.h`. Host-testable runtime configuration lives in `lib/BioVoltCore/RuntimeConfig.h`. At startup, firmware loads one versioned JSON configuration blob from Preferences/NVS, falling back to an ignored local `BuildSecrets.h` only when no valid NVS config exists. The active configuration is immutable for the current boot. Serial provisioning edits a draft, validates it, stores the complete blob, and requires reboot to apply network/device changes.
 
-**Tech Stack:** C++17, ESP32 Preferences, Arduino Serial, PlatformIO native tests for pure validation.
+**Tech Stack:** C++17, ESP32 Preferences, ArduinoJson 6.x, Arduino Serial, PlatformIO native tests.
 
 **Spec:** `docs/architecture/software-architecture.md`
 
 ## Global Constraints
 
 - `BuildSecrets.h` is ignored by Git and never committed.
-- Passwords and tokens must never be printed in clear text.
-- NVS namespace is `biovolt`.
+- Passwords and tokens never appear in clear-text logs or `config show` output.
+- Preferences namespace is `biovolt`.
+- The persisted key is one complete versioned blob: `config_v1`.
 - Device ID and cell ID are non-empty and maximum 64 characters.
-- Backend path defaults to `/ws/device`.
-- Backend port defaults to `8000`.
-- PWM safety bounds must remain inside 0..255.
-- Mixer max runtime is positive; cooldown is non-negative.
-- Sensor drivers consume board constants, not runtime network configuration.
+- Backend path defaults to `/ws/device`; backend port defaults to `8000`.
+- No specific laptop hotspot IP is assumed in committed files.
+- PWM safety bounds stay within `0..255`; mixer max runtime is positive and cooldown non-negative.
+- Active config is loaded once during boot and is not mutated while Sensor/Telemetry tasks are running.
+- `config save` writes the validated draft for the next reboot.
+- Sensor drivers consume `BoardConfig`, not runtime network config.
 
 ---
 
@@ -49,31 +51,32 @@ constexpr uint8_t kOpticalChannel = 1;
 
 - [ ] **Step 1: Create constants in one header**
 
-No driver may duplicate numeric pin values.
+No sensor/actuator driver may duplicate numeric pin values.
 
 - [ ] **Step 2: Document driver-stage warning**
 
-State that GPIO 25/26/27 are logic outputs and must not directly power the LED/mixer loads.
+GPIO 25/26/27 are logic outputs only. Probe LED, grow-light load, and mixer require suitable external driver stages.
 
-- [ ] **Step 3: Build ESP32 target**
+- [ ] **Step 3: Build target**
 
 ```bash
+cd firmware/esp32
 pio run -e esp32dev
 ```
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add firmware/esp32/include/BoardConfig.h firmware/esp32/README.md
+git add include/BoardConfig.h README.md
 git commit -m "feat: define BioVolt ESP32 board mapping"
 ```
 
 ---
 
-### Task 2: Define runtime configuration model and validation
+### Task 2: Define host-testable runtime configuration and validation
 
 **Files:**
-- Create: `firmware/esp32/src/config/RuntimeConfig.h`
+- Create: `firmware/esp32/lib/BioVoltCore/RuntimeConfig.h`
 - Create: `firmware/esp32/lib/BioVoltCore/ConfigValidation.h`
 - Create: `firmware/esp32/test/test_config_validation/test_main.cpp`
 
@@ -95,16 +98,33 @@ struct RuntimeConfig {
   uint16_t mixerCooldownS{60};
 };
 
+struct ConfigValidationResult {
+  bool valid;
+  const char* message;
+};
+
 ConfigValidationResult validateRuntimeConfig(const RuntimeConfig& config);
 ```
 
 - [ ] **Step 1: Write failing validation tests**
 
-Cover blank SSID, blank backend host, blank device/cell/token, `ledPwmMin > ledPwmMax`, zero mixer max runtime, and valid default port/path.
+Cover:
 
-- [ ] **Step 2: Implement validator without Arduino dependencies**
+```text
+blank SSID
+blank backendHost
+blank deviceId/cellId/token
+backendPort == 0
+backendPath not beginning with '/'
+ID length >64
+ledPwmMin > ledPwmMax
+mixerMaxRuntimeS == 0
+valid normal configuration
+```
 
-Return a structured result with `valid` and a short field-specific message.
+- [ ] **Step 2: Implement validation without Arduino dependencies**
+
+This file must compile in `env:native`.
 
 - [ ] **Step 3: Run native tests**
 
@@ -115,54 +135,60 @@ pio test -e native -f test_config_validation
 - [ ] **Step 4: Commit**
 
 ```bash
-git add firmware/esp32/src/config/RuntimeConfig.h firmware/esp32/lib/BioVoltCore/ConfigValidation.h firmware/esp32/test/test_config_validation
+git add lib/BioVoltCore/RuntimeConfig.h lib/BioVoltCore/ConfigValidation.h test/test_config_validation
 git commit -m "feat: validate BioVolt device runtime configuration"
 ```
 
 ---
 
-### Task 3: Add ignored build-secret fallback
+### Task 3: Add ignored first-boot secret fallback
 
 **Files:**
 - Create: `firmware/esp32/include/BuildSecrets.example.h`
-- Modify: `.gitignore`
+- Modify: root `.gitignore`
 - Modify: `firmware/esp32/README.md`
 
 **Interfaces:**
 
-Example file defines placeholders only:
+Committed example contains placeholders only:
 
 ```cpp
 #pragma once
 #define BIOVOLT_WIFI_SSID ""
 #define BIOVOLT_WIFI_PASSWORD ""
-#define BIOVOLT_BACKEND_HOST "192.168.137.1"
+#define BIOVOLT_BACKEND_HOST ""
 #define BIOVOLT_DEVICE_ID "biovolt-01"
 #define BIOVOLT_CELL_ID "cell-a"
 #define BIOVOLT_DEVICE_TOKEN ""
 ```
 
-- [ ] **Step 1: Ignore local secret file**
+- [ ] **Step 1: Ignore local file**
 
-Add `firmware/esp32/include/BuildSecrets.h` to root `.gitignore`.
+Add:
 
-- [ ] **Step 2: Document first-boot workflow**
+```text
+firmware/esp32/include/BuildSecrets.h
+```
+
+to root `.gitignore`.
+
+- [ ] **Step 2: Document first-boot copy**
 
 ```bash
 cp firmware/esp32/include/BuildSecrets.example.h firmware/esp32/include/BuildSecrets.h
 ```
 
-Then edit local values only.
+The backend host is discovered from the actual laptop hotspot/network and is never assumed by the committed example.
 
-- [ ] **Step 3: Verify Git ignores the local secret path**
+- [ ] **Step 3: Verify ignore rule**
 
 ```bash
 git check-ignore firmware/esp32/include/BuildSecrets.h
 ```
 
-Expected: path is ignored.
+Expected: ignored path is printed.
 
-- [ ] **Step 4: Commit only example/docs/ignore rules**
+- [ ] **Step 4: Commit only safe files**
 
 ```bash
 git add firmware/esp32/include/BuildSecrets.example.h .gitignore firmware/esp32/README.md
@@ -171,7 +197,7 @@ git commit -m "chore: add local BioVolt firmware secret fallback"
 
 ---
 
-### Task 4: Persist runtime configuration in Preferences/NVS
+### Task 4: Persist one versioned config blob in Preferences/NVS
 
 **Files:**
 - Create: `firmware/esp32/src/config/ConfigStore.h`
@@ -189,45 +215,75 @@ class ConfigStore {
 };
 ```
 
-Use short stable NVS keys under namespace `biovolt`, including:
+Persist one JSON object under key `config_v1`:
 
-```text
-ssid, wifi_pw, host, port, path, device_id, cell_id, token,
-pwm_min, pwm_max, mix_max, mix_cool
+```json
+{
+  "version": 1,
+  "wifi_ssid": "...",
+  "wifi_password": "...",
+  "backend_host": "...",
+  "backend_port": 8000,
+  "backend_path": "/ws/device",
+  "device_id": "biovolt-01",
+  "cell_id": "cell-a",
+  "device_token": "...",
+  "led_pwm_min": 0,
+  "led_pwm_max": 255,
+  "mixer_max_runtime_s": 10,
+  "mixer_cooldown_s": 60
+}
 ```
 
-- [ ] **Step 1: Implement NVS open/load/save**
+- [ ] **Step 1: Validate before serialization**
 
-Validate before saving. Reject invalid config without partially writing values.
+If draft config is invalid, return false before touching Preferences.
 
-- [ ] **Step 2: Ensure token/password are never logged**
+- [ ] **Step 2: Serialize complete blob in memory**
 
-Log only whether they are configured.
+Use a bounded ArduinoJson document and ensure serialization succeeds before the single `putString("config_v1", blob)` write.
 
-- [ ] **Step 3: Build ESP32 target**
+- [ ] **Step 3: Load defensively**
+
+On absent blob, parse failure, wrong version, or validation failure:
+
+```text
+log safe reason
+use fallback RuntimeConfig
+```
+
+Do not print the blob because it contains secrets.
+
+- [ ] **Step 4: Clear only project key/namespace**
+
+`clear()` removes the BioVolt stored configuration, not unrelated device preferences.
+
+- [ ] **Step 5: Build and commit**
 
 ```bash
 pio run -e esp32dev
-```
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add firmware/esp32/src/config
-git commit -m "feat: persist BioVolt device configuration in NVS"
+git add src/config
+git commit -m "feat: persist versioned BioVolt configuration blob in NVS"
 ```
 
 ---
 
-### Task 5: Add serial provisioning CLI
+### Task 5: Implement serial provisioner over a draft config
 
 **Files:**
 - Create: `firmware/esp32/src/provisioning/SerialProvisioner.h`
 - Create: `firmware/esp32/src/provisioning/SerialProvisioner.cpp`
-- Modify: `firmware/esp32/src/main.cpp`
 - Modify: `firmware/esp32/README.md`
 
 **Interfaces:**
+
+```cpp
+class SerialProvisioner {
+ public:
+  void begin(const RuntimeConfig& activeConfig, ConfigStore& store);
+  void poll();
+};
+```
 
 Supported commands:
 
@@ -245,51 +301,141 @@ config set pwm_max <0-255>
 config set mixer_max_runtime_s <value>
 config set mixer_cooldown_s <value>
 config save
+config discard
 config reset
+status
 reboot
 ```
 
-- [ ] **Step 1: Implement line-buffered parser**
+- [ ] **Step 1: Copy active config into internal draft**
 
-Reject lines longer than 256 bytes and malformed integers.
+`config set` mutates only the draft. It never changes the `RuntimeConfig` already passed to NetworkManager/TelemetryTask.
 
-- [ ] **Step 2: Implement redacted `config show`**
+- [ ] **Step 2: Implement bounded line parser**
 
-Expected example:
+Reject lines longer than 256 bytes and malformed/out-of-range integers.
+
+- [ ] **Step 3: Redact secret output**
+
+`config show` may print:
 
 ```text
 ssid=BioVolt-Hotspot
 wifi_password=<configured>
-backend_host=192.168.137.1
+backend_host=192.168.x.x
 backend_port=8000
 device_id=biovolt-01
 cell_id=cell-a
 token=<configured>
+pwm_min=0
+pwm_max=255
+mixer_max_runtime_s=10
+mixer_cooldown_s=60
 ```
 
-- [ ] **Step 3: Validate before `config save`**
+- [ ] **Step 4: Define save/apply semantics**
 
-Print the validation message and do not write invalid state.
+`config save`:
 
-- [ ] **Step 4: Build and manually verify with serial monitor**
+```text
+validate draft
+persist complete config_v1 blob
+print "saved; reboot required to apply"
+```
+
+It must not restart Wi-Fi or mutate the active runtime in-place.
+
+- [ ] **Step 5: Add safe `status` diagnostic**
+
+Print only non-secret operational fields:
+
+```text
+uptime_ms=<esp_timer_get_time()/1000>
+free_heap_bytes=<ESP.getFreeHeap()>
+device_id=<active device id>
+cell_id=<active cell id>
+backend_host=<active host>
+backend_port=<active port>
+config_pending=<true|false>
+```
+
+Never print password/token.
+
+- [ ] **Step 6: Build and bench-test parser**
 
 ```bash
 pio run -e esp32dev -t upload
 pio device monitor -b 115200
 ```
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add firmware/esp32/src/provisioning firmware/esp32/src/main.cpp firmware/esp32/README.md
+git add src/provisioning README.md
 git commit -m "feat: provision BioVolt ESP32 configuration over serial"
+```
+
+---
+
+### Task 6: Define startup configuration flow
+
+**Files:**
+- Modify: `firmware/esp32/src/main.cpp`
+
+**Interfaces:**
+
+Startup order:
+
+```text
+initialize Serial
+force actuator pins safe
+ConfigStore.begin()
+build local BuildSecrets fallback
+ConfigStore.load(fallback)
+validate active config
+initialize SerialProvisioner with active config + store
+initialize remaining runtime components with const active config
+start FreeRTOS tasks in Module 3.5
+```
+
+- [ ] **Step 1: Keep active config lifetime stable**
+
+Store one application-owned `RuntimeConfig` object for the entire boot. Consumers receive `const RuntimeConfig&` or pointers treated as immutable.
+
+- [ ] **Step 2: Define invalid-total-config degraded mode**
+
+If both NVS and fallback are invalid:
+
+```text
+actuators stay OFF
+sensor bench operation may initialize
+network/telemetry do not start
+serial provisioning remains available
+```
+
+This allows repair without reflashing.
+
+- [ ] **Step 3: Build target**
+
+```bash
+pio run -e esp32dev
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/main.cpp
+git commit -m "feat: load immutable BioVolt runtime configuration at boot"
 ```
 
 ## Module 3.2 Exit Criteria
 
 - [ ] Board wiring has one source of truth.
-- [ ] Runtime config is validated.
-- [ ] NVS persists configuration across reboot.
-- [ ] Local secrets file is ignored.
-- [ ] Serial CLI can change laptop/backend identity without reflashing.
-- [ ] Token/password never appear in logs.
+- [ ] RuntimeConfig/validation compile in native tests.
+- [ ] No committed file assumes a laptop hotspot IP.
+- [ ] NVS stores one validated `config_v1` blob.
+- [ ] Invalid/corrupt stored config falls back safely.
+- [ ] Local secret file is ignored.
+- [ ] Serial CLI edits a draft and requires reboot to apply saved changes.
+- [ ] `status` exposes uptime/free heap without secrets.
+- [ ] Active runtime configuration remains immutable during a boot session.
