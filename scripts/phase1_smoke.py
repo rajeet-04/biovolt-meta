@@ -89,7 +89,7 @@ def wait_for_device(
     poll_seconds: float,
     request_timeout_seconds: float,
 ) -> Mapping[str, Any]:
-    """Wait for the simulator to register, returning its latest status."""
+    """Wait for the expected device to register, returning its latest status."""
 
     deadline = time.monotonic() + timeout_seconds
     while True:

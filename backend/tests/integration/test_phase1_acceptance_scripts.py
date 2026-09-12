@@ -7,7 +7,14 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts"))
 
+import phase1_smoke  # noqa: E402
 import soak_phase1  # noqa: E402
+
+
+def test_smoke_acceptance_can_target_a_non_simulator_device() -> None:
+    args = phase1_smoke._parser().parse_args(["--device-id", "biovolt-hw-01"])
+
+    assert args.device_id == "biovolt-hw-01"
 
 
 def test_soak_checks_start_and_duration_boundary(monkeypatch) -> None:
