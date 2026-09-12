@@ -13,6 +13,7 @@ from biovolt_backend.persistence.throttle import PersistenceThrottle
 from biovolt_backend.services.telemetry_service import TelemetryService
 from biovolt_backend.websocket.dashboard_hub import DashboardHub
 from biovolt_backend.websocket.device_registry import DeviceRegistry
+from biovolt_backend.websocket.routes import router as websocket_router
 
 
 @asynccontextmanager
@@ -51,6 +52,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title=resolved.app_name, lifespan=lifespan)
     app.state.settings = resolved
     app.include_router(health_router)
+    app.include_router(websocket_router)
     return app
 
 
