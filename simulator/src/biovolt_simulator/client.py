@@ -56,6 +56,7 @@ class SimulatorClient:
 
         headers = device_headers(self.settings)
         attempt = 0
+        started = monotonic()
 
         while True:
             try:
@@ -64,7 +65,6 @@ class SimulatorClient:
                     additional_headers=headers,
                 ) as websocket:
                     attempt = 0
-                    started = monotonic()
                     while True:
                         elapsed = monotonic() - started
                         frame = self.generator.next_frame(elapsed)

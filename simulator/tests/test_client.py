@@ -3,6 +3,7 @@ import json
 from unittest.mock import Mock
 
 import pytest
+import websockets
 
 from biovolt_simulator.client import SimulatorClient, device_headers, reconnect_delay
 from biovolt_simulator.config import SimulatorSettings
@@ -65,6 +66,13 @@ class _RecordingWebSocket:
         self.sent.append(message)
 
 
+class _DisconnectingWebSocket(_RecordingWebSocket):
+    async def send(self, message: str) -> None:
+        await super().send(message)
+        if len(self.sent) == 2:
+            raise websockets.WebSocketException("connection closed")
+
+
 @pytest.mark.asyncio
 async def test_client_reconnects_and_preserves_cadence(
     monkeypatch: pytest.MonkeyPatch,
@@ -118,3 +126,44 @@ async def test_client_propagates_cancellation_from_connect(
 
     with pytest.raises(asyncio.CancelledError):
         await SimulatorClient(_settings()).run()
+
+
+@pytest.mark.asyncio
+async def test_client_preserves_elapsed_origin_across_reconnect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _settings()
+    generator = _RecordingGenerator()
+    first_websocket = _DisconnectingWebSocket()
+    second_websocket = _RecordingWebSocket()
+    connect_results = iter(
+        [_Context(value=first_websocket), _Context(value=second_websocket)]
+    )
+
+    def connect(_url: str, *, additional_headers: dict[str, str]) -> _Context:
+        del additional_headers
+        return next(connect_results)
+
+    sleep_calls: list[float] = []
+
+    async def sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+        if len(sleep_calls) == 3:
+            raise asyncio.CancelledError
+
+    monotonic_values = iter([100.0, 100.0, 100.5, 100.75, 101.0])
+    monkeypatch.setattr("biovolt_simulator.client.websockets.connect", connect)
+    monkeypatch.setattr("biovolt_simulator.client.asyncio.sleep", sleep)
+    monkeypatch.setattr(
+        "biovolt_simulator.client.monotonic", lambda: next(monotonic_values)
+    )
+
+    with pytest.raises(asyncio.CancelledError):
+        await SimulatorClient(settings, generator=generator).run()
+
+    first_frames = [json.loads(message) for message in first_websocket.sent]
+    second_frames = [json.loads(message) for message in second_websocket.sent]
+    assert first_frames[0]["elapsed"] == 0.0
+    assert second_frames[0]["elapsed"] > first_frames[-1]["elapsed"]
+    assert generator.elapsed == [0.0, 0.5, 0.75]
+    assert sleep_calls == [settings.interval_seconds, 1.0, settings.interval_seconds]
