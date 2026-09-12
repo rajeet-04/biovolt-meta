@@ -88,7 +88,7 @@ postcss
 autoprefixer
 ```
 
-Use a current mutually compatible version set at implementation time and commit the generated lockfile.
+Resolve one mutually compatible dependency set during implementation, install it once, and commit the generated `frontend/package-lock.json`. Do not mix lockfiles or package managers within the frontend.
 
 - [ ] **Step 3: Configure strict TypeScript and Vitest**
 
@@ -283,7 +283,7 @@ npm run build
 - [ ] **Step 4: Commit**
 
 ```bash
-git add frontend root-or-readme-path
+git add frontend/package.json frontend/package-lock.json frontend/eslint.config.js frontend/README.md README.md
 git commit -m "chore: enforce BioVolt frontend quality gates"
 ```
 
