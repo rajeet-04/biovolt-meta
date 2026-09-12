@@ -31,6 +31,20 @@ class ExperimentService:
                         "initial_mixer_on": arm.initial_mixer_on,
                         "label": arm.label,
                         "calibration_revision_id": arm.calibration_revision_id,
+                        "adaptive": {
+                            "initial_pwm": arm.adaptive_initial_pwm,
+                            "pwm_min": arm.adaptive_pwm_min,
+                            "pwm_max": arm.adaptive_pwm_max,
+                            "pwm_step": arm.adaptive_pwm_step,
+                            "settle_ms": arm.adaptive_settle_ms,
+                            "minimum_valid_samples": arm.adaptive_minimum_valid_samples,
+                            "objective_deadband_fraction": arm.adaptive_deadband_fraction,
+                            "mixer_policy": arm.adaptive_mixer_policy,
+                            "mixer_period_ms": arm.adaptive_mixer_period_ms,
+                            "mixer_on_ms": arm.adaptive_mixer_on_ms,
+                        }
+                        if arm.mode == "adaptive"
+                        else None,
                         "baseline_sequence": arm.baseline_sequence,
                         "baseline_timestamp": arm.baseline_timestamp,
                         "baseline_biomass_g_l": arm.baseline_biomass_g_l,
@@ -42,10 +56,25 @@ class ExperimentService:
         )
 
     def _arms(self, inputs: list[ExperimentArmInput], experiment_id: str) -> list[ExperimentArm]:
-        return [
-            ExperimentArm(id=str(uuid4()), experiment_id=experiment_id, **item.model_dump())
-            for item in inputs
-        ]
+        arms: list[ExperimentArm] = []
+        for item in inputs:
+            values = item.model_dump(exclude={"adaptive"})
+            adaptive = item.adaptive
+            if adaptive is not None:
+                values.update(
+                    adaptive_initial_pwm=adaptive.initial_pwm,
+                    adaptive_pwm_min=adaptive.pwm_min,
+                    adaptive_pwm_max=adaptive.pwm_max,
+                    adaptive_pwm_step=adaptive.pwm_step,
+                    adaptive_settle_ms=adaptive.settle_ms,
+                    adaptive_minimum_valid_samples=adaptive.minimum_valid_samples,
+                    adaptive_deadband_fraction=adaptive.objective_deadband_fraction,
+                    adaptive_mixer_policy=adaptive.mixer_policy,
+                    adaptive_mixer_period_ms=adaptive.mixer_period_ms,
+                    adaptive_mixer_on_ms=adaptive.mixer_on_ms,
+                )
+            arms.append(ExperimentArm(id=str(uuid4()), experiment_id=experiment_id, **values))
+        return arms
 
     async def create(self, request: ExperimentCreate) -> ExperimentView:
         now = datetime.now(UTC)

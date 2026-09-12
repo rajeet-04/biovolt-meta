@@ -1,4 +1,5 @@
 """Asynchronous experiment orchestration from device command outcomes."""
+# ruff: noqa: E501
 
 from biovolt_backend.commands.dispatcher import CommandDispatcher
 from biovolt_backend.commands.schemas import CommandCreate, CommandView, DeviceAck
@@ -37,7 +38,14 @@ class ExperimentOrchestrator:
                                     device_id=arm.device_id,
                                     experiment_id=experiment.id,
                                     kind="set_mode",
-                                    payload={"mode": arm.mode},
+                                    payload={
+                                        "mode": arm.mode,
+                                        **(
+                                            {"adaptive": arm.adaptive.model_dump(exclude_none=True)}
+                                            if arm.mode == "adaptive" and arm.adaptive
+                                            else {}
+                                        ),
+                                    },
                                 )
                             )
                         ).command_id
