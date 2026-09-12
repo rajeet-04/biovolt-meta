@@ -1,6 +1,43 @@
+from importlib import resources
+from pathlib import Path
+
 import pytest
 
+import biovolt_simulator.generator as generator_module
 from biovolt_simulator.generator import TelemetryGenerator, validate_telemetry_frame
+
+
+def test_packaged_schema_matches_canonical_source() -> None:
+    canonical = (
+        Path(__file__).resolve().parents[2]
+        / "shared"
+        / "schemas"
+        / "device-telemetry.v1.schema.json"
+    )
+    packaged = resources.files("biovolt_simulator").joinpath(
+        "schemas/device-telemetry.v1.schema.json"
+    )
+
+    assert packaged.read_bytes() == canonical.read_bytes()
+
+
+def test_packaged_schema_validates_without_source_tree(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    generator_module._telemetry_validator.cache_clear()
+    monkeypatch.setattr(
+        generator_module,
+        "_repository_root",
+        lambda: (_ for _ in ()).throw(RuntimeError("source tree unavailable")),
+    )
+
+    try:
+        frame = TelemetryGenerator(seed=42, device_id="d1", cell_id="c1").next_frame(
+            0.0
+        )
+        validate_telemetry_frame(frame)
+    finally:
+        generator_module._telemetry_validator.cache_clear()
 
 
 def test_same_seed_produces_same_first_frames() -> None:

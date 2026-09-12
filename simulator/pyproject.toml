@@ -27,6 +27,9 @@ biovolt-simulator = "biovolt_simulator.__main__:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+biovolt_simulator = ["schemas/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

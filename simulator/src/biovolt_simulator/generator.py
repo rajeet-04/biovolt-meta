@@ -7,6 +7,7 @@ import math
 import random
 from dataclasses import dataclass
 from functools import cache
+from importlib import resources
 from pathlib import Path
 from typing import Any
 
@@ -32,10 +33,19 @@ def _repository_root() -> Path:
 
 @cache
 def _telemetry_validator() -> Draft202012Validator:
-    schema_path = (
-        _repository_root() / "shared" / "schemas" / "device-telemetry.v1.schema.json"
-    )
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    try:
+        schema_path = (
+            _repository_root()
+            / "shared"
+            / "schemas"
+            / "device-telemetry.v1.schema.json"
+        )
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    except RuntimeError:
+        schema_resource = resources.files("biovolt_simulator").joinpath(
+            "schemas/device-telemetry.v1.schema.json"
+        )
+        schema = json.loads(schema_resource.read_text(encoding="utf-8"))
     return Draft202012Validator(schema)
 
 
