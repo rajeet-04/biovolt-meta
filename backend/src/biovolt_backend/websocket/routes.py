@@ -4,7 +4,11 @@ import json
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
+from pydantic import ValidationError
 
+from biovolt_backend.commands.schemas import DeviceAck
+from biovolt_backend.contracts.loader import validate_payload
 from biovolt_backend.services.telemetry_service import TelemetryRejected
 from biovolt_backend.websocket.auth import DeviceAuthenticationError, authenticate_device
 
@@ -31,6 +35,7 @@ async def device_websocket(websocket: WebSocket) -> None:
     await websocket.accept()
     registry = websocket.app.state.device_registry
     registry.connect(device_id, websocket)
+    await websocket.app.state.command_dispatcher.dispatch_pending_for_device(device_id)
     try:
         while True:
             try:
@@ -41,13 +46,30 @@ async def device_websocket(websocket: WebSocket) -> None:
             try:
                 payload = json.loads(frame)
                 if not isinstance(payload, dict):
-                    raise ValueError("telemetry frame must be an object")
-                await websocket.app.state.telemetry_service.handle_raw(
-                    payload,
-                    authenticated_device_id=device_id,
-                    received_at=datetime.now(UTC),
-                )
-            except (json.JSONDecodeError, TypeError, ValueError, TelemetryRejected):
+                    raise ValueError("device frame must be an object")
+                schema_version = payload.get("schema_version")
+                if schema_version == "device-ack.v1":
+                    validate_payload("device-ack.v1.schema.json", payload)
+                    ack = DeviceAck.model_validate(payload)
+                    if ack.device_id != device_id:
+                        raise ValueError("ack device id mismatch")
+                    await websocket.app.state.command_service.apply_ack(ack)
+                elif schema_version == 1:
+                    await websocket.app.state.telemetry_service.handle_raw(
+                        payload,
+                        authenticated_device_id=device_id,
+                        received_at=datetime.now(UTC),
+                    )
+                else:
+                    raise ValueError("unknown device frame schema")
+            except (
+                json.JSONDecodeError,
+                TypeError,
+                ValueError,
+                TelemetryRejected,
+                JsonSchemaValidationError,
+                ValidationError,
+            ):
                 await websocket.send_json(_error_payload())
     finally:
         registry.disconnect(device_id, websocket)

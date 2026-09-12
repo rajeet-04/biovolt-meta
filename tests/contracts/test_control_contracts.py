@@ -25,6 +25,13 @@ def test_device_command_example_is_valid() -> None:
     )
 
 
+def test_device_ack_example_is_valid() -> None:
+    assert_valid(
+        "shared/schemas/device-ack.v1.schema.json",
+        "shared/examples/device-ack.example.json",
+    )
+
+
 def test_calibration_profile_example_is_valid() -> None:
     assert_valid(
         "shared/schemas/calibration-profile.v1.schema.json",
@@ -49,23 +56,38 @@ def test_system_event_example_is_valid() -> None:
 @pytest.mark.parametrize("invalid_pwm", [-1, 256])
 def test_set_led_pwm_rejects_values_outside_byte_range(invalid_pwm: int) -> None:
     schema = load_json("shared/schemas/device-command.v1.schema.json")
-    payload = {
-        "schema_version": 1,
-        "command_id": "cmd-test",
-        "type": "set_led_pwm",
-        "payload": {"value": invalid_pwm},
-    }
+    payload = load_json("shared/examples/device-command.example.json")
+    payload["payload"] = {"pwm": invalid_pwm}
     assert list(Draft202012Validator(schema).iter_errors(payload))
 
 
 def test_unknown_command_type_is_rejected() -> None:
     schema = load_json("shared/schemas/device-command.v1.schema.json")
-    payload = {
-        "schema_version": 1,
-        "command_id": "cmd-test",
-        "type": "do_magic",
-        "payload": {},
-    }
+    payload = load_json("shared/examples/device-command.example.json")
+    payload["kind"] = "do_magic"
+    payload["payload"] = {}
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+
+
+def test_command_payloads_are_strict_and_require_fields() -> None:
+    schema = load_json("shared/schemas/device-command.v1.schema.json")
+    payload = load_json("shared/examples/device-command.example.json")
+    payload["payload"] = {"pwm": 96, "gpio": 26}
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+    payload["payload"] = {}
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+
+
+def test_ack_rejects_unknown_status_reason_and_missing_command_id() -> None:
+    schema = load_json("shared/schemas/device-ack.v1.schema.json")
+    payload = load_json("shared/examples/device-ack.example.json")
+    payload["status"] = "done"
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+    payload = load_json("shared/examples/device-ack.example.json")
+    payload["reason_code"] = "mystery"
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+    payload = load_json("shared/examples/device-ack.example.json")
+    del payload["command_id"]
     assert list(Draft202012Validator(schema).iter_errors(payload))
 
 

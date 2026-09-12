@@ -1,9 +1,12 @@
-FROM oven/bun:1.4.0-alpine
+FROM oven/bun:1.4.0-alpine AS build
 WORKDIR /app
 COPY frontend/package.json frontend/bun.lock ./
 RUN bun install --frozen-lockfile
 COPY frontend/ ./
 RUN bun run build
-ENV BIOVOLT_PROXY_TARGET=http://backend:8000
-EXPOSE 4173
-CMD ["bun", "run", "preview", "--", "--host", "0.0.0.0", "--port", "4173"]
+FROM nginx:1.29-alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY deploy/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY deploy/nginx/conf.d/operator.conf /etc/nginx/conf.d/default.conf
+COPY deploy/nginx/conf.d/public-read-only.conf /etc/nginx/conf.d/public-read-only.conf
+EXPOSE 80

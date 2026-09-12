@@ -5,11 +5,11 @@ services:
       dockerfile: backend/Dockerfile
     env_file:
       - .env
-    ports:
-      - "8000:8000"
+    restart: unless-stopped
     environment:
-      - BIOVOLT_ENVIRONMENT=development
+      - BIOVOLT_ENVIRONMENT=production
       - BIOVOLT_DATABASE_URL=sqlite+aiosqlite:////data/biovolt.db
+      - BIOVOLT_EXPORT_DIR=/data/exports
       - BIOVOLT_DEVICE_SHARED_TOKEN=${BIOVOLT_DEVICE_SHARED_TOKEN:?BIOVOLT_DEVICE_SHARED_TOKEN must be set in .env or the shell}
       - BIOVOLT_LOAD_RESISTANCE_OHM=${BIOVOLT_LOAD_RESISTANCE_OHM:-100000}
     volumes:
@@ -25,6 +25,23 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  nginx:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "8081:8081"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   simulator:
     profiles:
@@ -43,19 +60,23 @@ services:
       - BIOVOLT_SIM_INTERVAL_SECONDS=0.5
       - BIOVOLT_SIM_SEED=42
 
+  cloudflared:
+    profiles:
+      - public
+    image: cloudflare/cloudflared:2025.8.1
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${BIOVOLT_CLOUDFLARED_TUNNEL_TOKEN:-}
+    depends_on:
+      nginx:
+        condition: service_healthy
+
   frontend:
     profiles:
       - frontend
     build:
       context: .
       dockerfile: frontend/Dockerfile
-    depends_on:
-      backend:
-        condition: service_healthy
-    environment:
-      - BIOVOLT_PROXY_TARGET=http://backend:8000
-    ports:
-      - "4173:4173"
 
 volumes:
   biovolt-data:

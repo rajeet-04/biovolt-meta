@@ -37,9 +37,9 @@ jobs:
             ${{ runner.os }}-pio-
 
       - name: Run native C++ tests
-        run: .venv/bin/pio test -e native
+        run: ../../.venv/bin/pio test -e native
         working-directory: firmware/esp32
 
       - name: Build ESP32 target
-        run: .venv/bin/pio run -e esp32dev
+        run: ../../.venv/bin/pio run -e esp32dev
         working-directory: firmware/esp32

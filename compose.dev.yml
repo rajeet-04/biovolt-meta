@@ -1,0 +1,9 @@
+services:
+  backend:
+    environment:
+      - BIOVOLT_ENVIRONMENT=development
+    ports:
+      - "8000:8000"
+  nginx:
+    ports:
+      - "8080:80"
