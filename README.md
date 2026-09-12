@@ -21,7 +21,33 @@ BioVolt is an adaptive living biophotovoltaic research prototype for MetaMorph 2
 
 ## Current Development Phase
 
-Phase 1: backend, simulator, persistence, and integration development.
+Phase 2.1: frontend foundation and application shell. Backend, simulator,
+persistence, and integration work from Phase 1 remain available for local
+development; frontend backend integration begins in Phase 2.2.
+
+## Frontend Development
+
+The Phase 2.1 frontend is a shell-only React/Vite application. Start it from
+the repository root with:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Run its lint, strict typecheck, tests, and production build before handing off
+frontend changes:
+
+```bash
+npm run lint
+npm run typecheck
+npm run test:run
+npm run build
+```
+
+This phase does not connect the frontend to FastAPI or calculate telemetry;
+those integration contracts are added in Phase 2.2.
 
 ## Docker Compose Development Stack
 
