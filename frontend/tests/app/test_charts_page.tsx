@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChartsPage } from '../../src/pages/ChartsPage'
@@ -44,7 +44,7 @@ beforeEach(() => {
     wsState: 'disconnected',
     lastSocketError: null,
   })
-  mockedHistory.mockReturnValue({ data: [], loading: false, error: null, reload: vi.fn() })
+  mockedHistory.mockReset()
 })
 
 describe('ChartsPage', () => {
@@ -93,12 +93,7 @@ describe('ChartsPage', () => {
 
   it('loads recent stored samples for the selected source without changing the live socket mode', async () => {
     const stored = frame(latestTimestamp - 120_000, { sequence: 22, electrical: { ...frame(latestTimestamp).electrical, power_uw: 2.5 } })
-    mockedHistory.mockImplementation((deviceId: string | null, cellId: string | null) => ({
-      data: deviceId === null || cellId === null ? [] : [stored],
-      loading: false,
-      error: null,
-      reload: vi.fn(),
-    }))
+    mockedHistory.mockResolvedValue([stored])
     useTelemetryStore.getState().ingest(frame(latestTimestamp))
 
     render(<ChartsPage />)
@@ -108,6 +103,15 @@ describe('ChartsPage', () => {
 
     expect(screen.getByText('Data mode: Recent stored samples')).toBeInTheDocument()
     expect(screen.getByText('biovolt-01 · cell-a')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('region', { name: 'Power' })).getByText(/Showing 1 samples from/),
+      ).toBeInTheDocument(),
+    )
     expect(screen.getByRole('combobox', { name: 'Chart data mode' })).toHaveValue('history')
+    expect(mockedHistory).toHaveBeenLastCalledWith(
+      { deviceId: 'biovolt-01', cellId: 'cell-a', limit: 1000 },
+      expect.any(AbortSignal),
+    )
   })
 })
