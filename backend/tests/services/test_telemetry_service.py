@@ -201,3 +201,48 @@ async def test_handle_raw_rejects_naive_receive_timestamp_before_side_effects() 
     assert repository.calls == []
     assert hub.payloads == []
     assert registry.calls == []
+
+
+@pytest.mark.parametrize("non_finite", [float("nan"), float("inf"), float("-inf")])
+async def test_handle_raw_rejects_non_finite_numeric_values_before_side_effects(
+    non_finite: float,
+) -> None:
+    events: list[str] = []
+    service, energy, throttle, repository, hub, registry = service_with_fakes(events)
+    payload = canonical_payload()
+    payload["environment"]["lux"] = non_finite  # type: ignore[index]
+
+    with pytest.raises(TelemetryRejected, match="non-finite telemetry value"):
+        await service.handle_raw(
+            payload,
+            "biovolt-01",
+            datetime(2026, 8, 23, 12, 0, tzinfo=UTC),
+        )
+
+    assert events == []
+    assert energy.calls == []
+    assert throttle.calls == []
+    assert repository.calls == []
+    assert hub.payloads == []
+    assert registry.calls == []
+
+
+async def test_handle_raw_rejects_json_nan_before_side_effects() -> None:
+    events: list[str] = []
+    service, energy, throttle, repository, hub, registry = service_with_fakes(events)
+    payload = canonical_payload()
+    payload["electrical"]["bpv_voltage_mv"] = json.loads("NaN")  # type: ignore[index]
+
+    with pytest.raises(TelemetryRejected, match="non-finite telemetry value"):
+        await service.handle_raw(
+            payload,
+            "biovolt-01",
+            datetime(2026, 8, 23, 12, 0, tzinfo=UTC),
+        )
+
+    assert events == []
+    assert energy.calls == []
+    assert throttle.calls == []
+    assert repository.calls == []
+    assert hub.payloads == []
+    assert registry.calls == []

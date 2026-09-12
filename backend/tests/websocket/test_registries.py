@@ -1,7 +1,6 @@
 import asyncio
 from datetime import UTC, datetime
 
-
 from biovolt_backend.websocket.dashboard_hub import DashboardHub
 from biovolt_backend.websocket.device_registry import DeviceRegistry
 

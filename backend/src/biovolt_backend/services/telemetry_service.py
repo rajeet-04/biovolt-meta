@@ -1,5 +1,7 @@
 """Orchestrate validation, processing, persistence, and telemetry fanout."""
 
+import math
+from collections.abc import Mapping
 from datetime import UTC, datetime
 
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
@@ -18,6 +20,19 @@ from biovolt_backend.websocket.device_registry import DeviceRegistry
 
 class TelemetryRejected(ValueError):
     """Raised when an incoming telemetry frame cannot be accepted."""
+
+
+def _ensure_finite_payload(value: object) -> None:
+    """Reject non-finite numbers accepted by Python's permissive JSON decoder."""
+
+    if isinstance(value, float) and not math.isfinite(value):
+        raise TelemetryRejected("non-finite telemetry value")
+    if isinstance(value, Mapping):
+        for nested in value.values():
+            _ensure_finite_payload(nested)
+    elif isinstance(value, (list, tuple)):
+        for nested in value:
+            _ensure_finite_payload(nested)
 
 
 class TelemetryService:
@@ -47,6 +62,7 @@ class TelemetryService:
     ) -> ProcessedTelemetryV1:
         """Validate, process, optionally persist, and broadcast one raw frame."""
 
+        _ensure_finite_payload(payload)
         try:
             validate_payload("device-telemetry.v1.schema.json", payload)
             raw = DeviceTelemetryV1.model_validate(payload)
