@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useSystemStore } from '../../stores/systemStore'
 
 interface SidebarProps {
   isOpen: boolean
@@ -16,13 +17,15 @@ const links = [
 ]
 
 export function Sidebar({ isOpen, onNavigate }: SidebarProps) {
+  const publicMode = useSystemStore((state) => state.capabilities?.access_mode === 'public_read_only')
+  const visibleLinks = publicMode ? links.filter((link) => !['/control', '/calibration'].includes(link.to)) : links
   return (
     <aside
       className={`${isOpen ? 'block' : 'hidden'} border-b border-bio-border bg-bio-panel md:block md:min-h-[calc(100vh-4rem)] md:w-60 md:border-b-0 md:border-r`}
     >
       <nav aria-label="Primary navigation" className="p-4" id="primary-navigation">
         <ul className="m-0 grid list-none gap-1 p-0">
-          {links.map((link) => (
+          {visibleLinks.map((link) => (
             <li key={link.to}>
               <NavLink
                 className={({ isActive }) =>

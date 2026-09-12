@@ -66,10 +66,17 @@ services:
     image: cloudflare/cloudflared:2025.8.1
     command: tunnel --no-autoupdate run
     environment:
-      - TUNNEL_TOKEN=${BIOVOLT_CLOUDFLARED_TUNNEL_TOKEN:?set token only for public profile}
+      - TUNNEL_TOKEN=${BIOVOLT_CLOUDFLARED_TUNNEL_TOKEN:-}
     depends_on:
       nginx:
         condition: service_healthy
+
+  frontend:
+    profiles:
+      - frontend
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
 
 volumes:
   biovolt-data:

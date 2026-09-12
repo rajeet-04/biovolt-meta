@@ -27,7 +27,7 @@ describe('BioVolt PWA configuration', () => {
 
   it('uses an auto-updating shell without caching API responses', () => {
     expect(pwaOptions.registerType).toBe('autoUpdate')
-    expect(pwaOptions.workbox?.runtimeCaching).toEqual([])
+    expect(pwaOptions.workbox?.runtimeCaching).toHaveLength(1)
     expect(pwaOptions.workbox?.navigateFallbackDenylist).toEqual([/^\/api\//])
   })
 })

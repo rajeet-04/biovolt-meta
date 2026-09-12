@@ -1,0 +1,3 @@
+import type { FreshnessState } from '../../lib/dataFreshness'
+const copy: Record<FreshnessState, string> = { loading: 'Loading telemetry status…', live: 'Live', stale: 'Stale telemetry', device_disconnected: 'Device disconnected', backend_disconnected: 'Backend disconnected', cached_offline: 'Showing cached data', no_data: 'No telemetry data', error: 'Telemetry status unavailable' }
+export function DataFreshnessBanner({ state, lastTimestamp }: { state: FreshnessState; lastTimestamp?: string | null }) { return <p className="rounded border border-bio-border px-3 py-2 text-sm text-bio-muted" role="status">{copy[state]}{state !== 'live' && lastTimestamp ? ` · Last valid sample: ${lastTimestamp}` : ''}</p> }
