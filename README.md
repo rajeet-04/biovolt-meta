@@ -70,12 +70,12 @@ python scripts/soak_phase1.py --minutes 30
 
 The smoke check validates backend health, simulator registration, derived
 power, and multiple persisted samples. The soak check polls every 30 seconds,
-requires fresh telemetry, tolerates a bounded simulator reconnect, rejects
-negative cumulative energy, and checks the persisted-row rate against a 90% to
-110% range. The history endpoint is bounded to 1,000 samples; if a longer run
-fills that window, the script reports the limitation while continuing to check
-freshness and monotonic history. Both scripts are read-only and do not print or
-accept device tokens.
+requires fresh live and persisted telemetry, tolerates a bounded simulator
+reconnect, rejects negative cumulative energy, and checks the persisted-row
+rate against a 90% to 110% range. The history endpoint is bounded to 1,000
+samples; after that window fills, the script verifies its timestamp span remains
+between 0.90 and 1.10 Hz. Both scripts are read-only and do not print or accept
+device tokens.
 
 ## Scientific Ownership Rule
 
