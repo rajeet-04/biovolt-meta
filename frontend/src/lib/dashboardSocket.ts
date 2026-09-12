@@ -10,6 +10,7 @@ export interface DashboardWebSocket {
   onopen: (() => void) | null
   onclose: (() => void) | null
   onmessage: ((event: { data: unknown }) => void) | null
+  onerror?: (() => void) | null
   close(): void
 }
 
@@ -78,6 +79,9 @@ export class DashboardSocketClient {
       socket.onmessage = null
       socket.onclose = null
       socket.close()
+      // Some browser WebSocket implementations clear handlers during close;
+      // keep late connection errors from becoming uncaught after unmount.
+      socket.onerror = () => undefined
     }
 
     if (wasRunning) this.handlers.onState('disconnected')
@@ -96,6 +100,8 @@ export class DashboardSocketClient {
     }
 
     this.socket = socket
+    // The close callback owns reconnect state; consume browser error events.
+    socket.onerror = () => undefined
     socket.onopen = () => {
       if (this.socket !== socket || this.stopped) return
       this.reconnectAttempt = 0
