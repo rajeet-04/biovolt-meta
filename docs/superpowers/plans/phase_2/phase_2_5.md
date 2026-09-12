@@ -6,7 +6,7 @@
 
 **Architecture:** `vite-plugin-pwa` caches the application shell/static assets. Dexie/IndexedDB stores a bounded local copy of processed telemetry and selected-source UI state. Runtime connectivity is determined by backend WebSocket/REST reachability, not merely `navigator.onLine`. On reconnect, the app resynchronizes with backend latest/history before clearing cached/stale banners.
 
-**Tech Stack:** vite-plugin-pwa, Workbox through plugin configuration, Dexie, IndexedDB, Zustand, React.
+**Tech Stack:** vite-plugin-pwa, Workbox through plugin configuration, Dexie, IndexedDB, Zustand, React, Sharp as a build-time icon generator.
 
 **Spec:** `docs/architecture/software-architecture.md`
 
@@ -20,14 +20,20 @@
 - Cached scientific values are never recalculated in the frontend.
 - Cache is bounded and pruned.
 - Reconnect/resync behavior is source-neutral and works for simulator or hardware.
+- PWA manifest must reference real 192x192 and 512x512 PNG icons generated from a project-owned BioVolt SVG mark.
 
 ---
 
-### Task 1: Configure installable PWA manifest and service worker
+### Task 1: Configure installable PWA manifest, icons, and service worker
 
 **Files:**
+- Modify: `frontend/package.json`
 - Modify: `frontend/vite.config.ts`
 - Create: `frontend/public/biovolt-mark.svg`
+- Create: `frontend/public/icons/pwa-192x192.png`
+- Create: `frontend/public/icons/pwa-512x512.png`
+- Create: `frontend/public/icons/pwa-maskable-512x512.png`
+- Create: `frontend/scripts/generate-pwa-icons.mjs`
 - Create: `frontend/src/pwa/registerPwa.ts`
 - Modify: `frontend/src/main.tsx`
 - Create: `frontend/tests/app/test_pwa_config.ts`
@@ -38,32 +44,86 @@
 - Display: `standalone`
 - Theme/background align with dashboard dark theme.
 - Start URL: `/`
+- Icons: 192x192, 512x512, and maskable 512x512.
 
 - [ ] **Step 1: Add static BioVolt mark asset**
 
-Use a simple original leaf/lightning mark in SVG. Keep it project-owned and dependency-free.
+Create an original SVG mark using the project accent green, dark background, and a simple leaf/lightning motif. It must not use third-party copyrighted artwork.
 
-- [ ] **Step 2: Configure `VitePWA`**
+- [ ] **Step 2: Add deterministic PNG icon generation**
 
-Use `registerType: 'autoUpdate'`. Precache static build assets only. Configure navigation fallback for application routes.
+Add `sharp` as a frontend development dependency and an npm script:
+
+```json
+{
+  "scripts": {
+    "icons:pwa": "node scripts/generate-pwa-icons.mjs"
+  }
+}
+```
+
+Generator shape:
+
+```js
+import sharp from 'sharp'
+import { mkdir } from 'node:fs/promises'
+
+await mkdir('public/icons', { recursive: true })
+
+for (const size of [192, 512]) {
+  await sharp('public/biovolt-mark.svg')
+    .resize(size, size)
+    .png()
+    .toFile(`public/icons/pwa-${size}x${size}.png`)
+}
+
+await sharp('public/biovolt-mark.svg')
+  .resize(512, 512, { fit: 'contain', background: '#0c100e' })
+  .png()
+  .toFile('public/icons/pwa-maskable-512x512.png')
+```
+
+Run:
+
+```bash
+npm run icons:pwa
+```
+
+and commit generated PNGs so installation does not require icon generation at runtime.
+
+- [ ] **Step 3: Configure `VitePWA`**
+
+Use `registerType: 'autoUpdate'`. Manifest must reference:
+
+```text
+/icons/pwa-192x192.png  sizes=192x192 purpose=any
+/icons/pwa-512x512.png  sizes=512x512 purpose=any
+/icons/pwa-maskable-512x512.png sizes=512x512 purpose=maskable
+```
+
+Precache static build assets only. Configure navigation fallback for application routes.
 
 Explicitly exclude API routes from runtime caching. Do not define a NetworkFirst/StaleWhileRevalidate rule for `/api`.
 
-- [ ] **Step 3: Add service-worker registration module**
+- [ ] **Step 4: Add service-worker registration module**
 
-Expose UI-safe update state but do not force reload while the user is reading telemetry. An available update may show a nonblocking refresh prompt later.
+Expose UI-safe update state but do not force reload while the user is reading telemetry. An available update can surface as a nonblocking refresh action.
 
-- [ ] **Step 4: Add configuration test**
+- [ ] **Step 5: Add configuration test**
 
-Inspect `vite.config.ts` or exported config to verify manifest name/start URL and absence of API runtime-cache pattern.
+Inspect the exported Vite config/manifest configuration and verify:
+- name/start URL/display mode
+- required 192/512/maskable icons
+- no `/api` runtime-cache rule
 
-- [ ] **Step 5: Build and commit**
+- [ ] **Step 6: Build and commit**
 
 ```bash
 cd frontend
+npm run icons:pwa
 npm run test:run
 npm run build
-git add vite.config.ts public src/pwa src/main.tsx tests/app/test_pwa_config.ts
+git add package.json package-lock.json vite.config.ts public scripts/generate-pwa-icons.mjs src/pwa src/main.tsx tests/app/test_pwa_config.ts
 git commit -m "feat: make BioVolt dashboard an installable PWA"
 ```
 
@@ -83,6 +143,7 @@ export interface CachedTelemetryRow {
   key: string
   source_key: string
   timestamp: string
+  sequence: number
   received_cache_at: string
   payload: ProcessedTelemetryV1
 }
@@ -96,25 +157,27 @@ export interface UiStateRow {
 Dexie stores:
 
 ```text
-telemetry_cache: key, source_key, timestamp
+telemetry_cache: key, source_key, timestamp, sequence
 ui_state: key
 ```
 
 - [ ] **Step 1: Write cache round-trip test**
 
-Insert one processed frame and retrieve it without changing scientific values.
+Insert one processed frame and retrieve it without changing `sequence`, nullable values, or any scientific value.
 
 - [ ] **Step 2: Implement cache key**
 
 Use deterministic composite string:
 
 ```text
-<device_id>::<cell_id>::<timestamp>
+<device_id>::<cell_id>::<sequence>::<timestamp>
 ```
+
+This avoids accidental collision when two frames share an unusually close server timestamp and preserves traceability to the processed telemetry sequence.
 
 - [ ] **Step 3: Add `cacheTelemetry(frame)`**
 
-Store exact payload and cache-write timestamp.
+Store exact payload, sequence, and cache-write timestamp.
 
 - [ ] **Step 4: Add `loadCachedTelemetry(sourceKey, limit)`**
 
@@ -188,7 +251,7 @@ Use a deliberately delayed fake cache write. Assert store updates before cache p
 
 - [ ] **Step 2: Write cache-failure isolation test**
 
-If IndexedDB/cache write rejects, frame remains live in store and socket stays connected. Record a nonfatal cache status if desired.
+If IndexedDB/cache write rejects, frame remains live in store and socket stays connected. Record a nonfatal cache status if the store exposes one.
 
 - [ ] **Step 3: Implement cache call after ingest**
 
@@ -267,7 +330,7 @@ A state sequence `disconnected -> connecting -> connected` triggers one resync, 
 1. fetch system status
 2. if selected source exists, fetch latest
 3. fetch recent history
-4. ingest latest into live store only if it is newer than stored latest
+4. ingest latest into live store only if it is newer than stored latest by timestamp/sequence semantics
 5. retain history for charts/cache
 
 - [ ] **Step 3: Abort obsolete resync**
@@ -296,10 +359,11 @@ git commit -m "feat: resynchronize BioVolt PWA after backend reconnect"
 
 ## Module 2.5 Exit Criteria
 
-- [ ] PWA builds with manifest and service worker.
+- [ ] PWA builds with manifest, service worker, and committed 192/512/maskable icons.
 - [ ] Static app shell works after external internet is disabled.
 - [ ] Scientific REST responses are not silently service-worker cached.
 - [ ] Processed telemetry is cached in IndexedDB at bounded cadence.
+- [ ] Cache preserves telemetry `sequence` and nullable fields exactly.
 - [ ] Cache is bounded to 3,600 rows/source.
 - [ ] Live UI updates are not blocked by IndexedDB.
 - [ ] Cached data is visibly labeled cached with original timestamp.
