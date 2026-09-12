@@ -17,6 +17,7 @@
 - Units are explicit and consistent.
 - Live/stale/disconnected states must be visible without relying only on color.
 - Selected device/cell source is shown in the UI.
+- Processed telemetry `sequence` is preserved and visible in the Live Data inspection view.
 - Simulator and hardware sources are treated identically.
 
 ---
@@ -200,12 +201,12 @@ BPV Voltage           mV
 Current               µA
 Power                 µW
 Cumulative Energy     mJ
-OD680                  unitless
+OD680                 unitless
 Temperature           °C
-Light                  lux
-Grow LED PWM           raw 0-255 or backend-defined value
-Mixer                  On/Off
-Control Mode           text
+Light                 lux
+Grow LED PWM          raw 0-255
+Mixer                 On/Off
+Control Mode          text
 ```
 
 Biomass/CO2 fields may be shown only when non-null and must preserve wording `Estimated CO2 biofixed into biomass`.
@@ -218,15 +219,19 @@ Render a clear message such as `Waiting for BioVolt telemetry` and connection st
 
 Feed one processed telemetry frame and assert voltage/current/power/OD680 are the exact backend values after display formatting.
 
-- [ ] **Step 3: Implement page**
+- [ ] **Step 3: Write nullable-energy test**
+
+Feed a valid processed frame with `cumulative_energy_mj: null` and assert the card renders `Unavailable`, not `0 mJ`.
+
+- [ ] **Step 4: Implement page**
 
 Top area shows selected source, connection state, telemetry freshness, and timestamp. Metric grid follows.
 
-- [ ] **Step 4: Add actuator/control summary**
+- [ ] **Step 5: Add actuator/control summary**
 
 Show LED PWM, mixer, and mode as observed state only. Do not add controls/buttons that send commands.
 
-- [ ] **Step 5: Run and commit**
+- [ ] **Step 6: Run and commit**
 
 ```bash
 npm run test:run -- test_overview_page
@@ -259,7 +264,7 @@ Identity/Freshness
 
 - [ ] **Step 1: Write exact-field rendering test**
 
-Assert at least `device_id`, `cell_id`, timestamp, voltage, current, power, OD680, temperature, lux, LED PWM, mixer, and mode appear.
+Assert at least `device_id`, `cell_id`, `sequence`, timestamp, voltage, current, power, cumulative energy, OD680, temperature, lux, LED PWM, mixer, and mode appear.
 
 - [ ] **Step 2: Write null biological-value test**
 
@@ -267,7 +272,7 @@ Null biomass/carbon values must render `Unavailable` without hiding the fact tha
 
 - [ ] **Step 3: Implement grouped table**
 
-Use semantic table or definition-list markup. Include units in labels/value cells.
+Use semantic table or definition-list markup. Include units in labels/value cells. Sequence is identity/ordering metadata and has no physical unit.
 
 - [ ] **Step 4: Run full module quality gate**
 
@@ -289,10 +294,10 @@ git commit -m "feat: add BioVolt live telemetry inspection screen"
 
 - [ ] Overview renders no fake values while waiting for telemetry.
 - [ ] Current/power/OD680 are displayed from backend payload, not recalculated.
-- [ ] Null fields render `Unavailable`.
+- [ ] Nullable cumulative energy and other null fields render `Unavailable`.
 - [ ] Source identity and freshness are visible.
 - [ ] Device stale and socket disconnected are distinguishable.
-- [ ] Live Data page exposes exact latest backend telemetry in grouped form.
+- [ ] Live Data page exposes required processed telemetry fields including `sequence`.
 - [ ] Actuator state is observational only.
 - [ ] Source selector is device-source neutral.
 - [ ] Tests, lint, typecheck, and build pass.
