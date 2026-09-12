@@ -9,6 +9,7 @@ from pydantic import ValidationError as PydanticValidationError
 
 from biovolt_backend.contracts.loader import validate_payload
 from biovolt_backend.contracts.models import DeviceTelemetryV1, ProcessedTelemetryV1
+from biovolt_backend.domain.continuity import TelemetryContinuityTracker
 from biovolt_backend.domain.electrical import current_ua, power_uw
 from biovolt_backend.domain.energy import EnergyAccumulator
 from biovolt_backend.domain.processing import ProcessingConfig, build_processed_telemetry
@@ -79,9 +80,11 @@ class TelemetryService:
         repository: TelemetryRepository,
         dashboard_hub: DashboardHub,
         device_registry: DeviceRegistry,
+        continuity: TelemetryContinuityTracker | None = None,
     ) -> None:
         self._config = config
         self._energy = energy
+        self._continuity = continuity or TelemetryContinuityTracker()
         self._throttle = throttle
         self._repository = repository
         self._dashboard_hub = dashboard_hub
@@ -116,17 +119,28 @@ class TelemetryService:
             if voltage_mv is not None
             else (None, None)
         )
+        continuity = self._continuity.observe(
+            raw.device_id, raw.cell_id, raw.sequence, raw.uptime_ms, commit=False
+        )
         try:
-            energy_mj = self._energy.update(
-                raw.device_id,
-                raw.cell_id,
-                raw.uptime_ms,
-                measured_power_uw,
-            )
+            if continuity.restarted:
+                self._energy.reset(raw.device_id, raw.cell_id)
+                energy_mj = self._energy.anchor(
+                    raw.device_id, raw.cell_id, raw.uptime_ms, measured_power_uw
+                )
+            elif continuity.contiguous:
+                energy_mj = self._energy.update(
+                    raw.device_id, raw.cell_id, raw.uptime_ms, measured_power_uw
+                )
+            else:
+                energy_mj = self._energy.anchor(
+                    raw.device_id, raw.cell_id, raw.uptime_ms, measured_power_uw
+                )
         except OverflowError as exc:
             raise TelemetryRejected("cumulative energy overflow") from exc
         if not math.isfinite(energy_mj):
             raise TelemetryRejected("cumulative energy overflow")
+        self._continuity.observe(raw.device_id, raw.cell_id, raw.sequence, raw.uptime_ms)
         processed = build_processed_telemetry(
             raw,
             timestamp=received_at,

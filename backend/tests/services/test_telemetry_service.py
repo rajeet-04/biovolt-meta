@@ -38,6 +38,18 @@ class FakeEnergy:
         self.calls.append((device_id, cell_id, uptime_ms, power_uw))
         return 12.5
 
+    def anchor(
+        self,
+        device_id: str,
+        cell_id: str,
+        uptime_ms: int,
+        power_uw: float | None,
+    ) -> float:
+        return self.update(device_id, cell_id, uptime_ms, power_uw)
+
+    def reset(self, device_id: str, cell_id: str) -> None:
+        self.events.append("energy_reset")
+
 
 class FakeThrottle:
     def __init__(self, events: list[str], allowed: bool = True) -> None:
@@ -203,7 +215,7 @@ async def test_handle_raw_uses_device_uptime_when_server_receive_is_delayed() ->
     assert registry.calls[-1][-1] == second_received_at
 
 
-async def test_handle_raw_accepts_sequence_gap_without_fabricating_sample() -> None:
+async def test_handle_raw_sequence_gap_preserves_prior_energy() -> None:
     events: list[str] = []
     service, _, _, repository, hub, _ = service_with_real_energy(events)
     first = canonical_payload()
@@ -219,13 +231,61 @@ async def test_handle_raw_accepts_sequence_gap_without_fabricating_sample() -> N
     processed = await service.handle_raw(second, "biovolt-01", received_at)
 
     assert processed.sequence == 102
-    first_power_uw = power_uw(438.2, 100_000.0)
-    second_power_uw = power_uw(876.4, 100_000.0)
-    assert processed.electrical.cumulative_energy_mj == pytest.approx(
-        (first_power_uw + second_power_uw) / 2.0 * 0.575 / 1000.0
-    )
+    assert processed.electrical.cumulative_energy_mj == 0.0
     assert [payload["sequence"] for payload in hub.payloads] == [100, 102]
     assert [raw.sequence for raw, _, _ in repository.calls] == [100, 102]
+
+
+async def test_handle_raw_resumes_energy_only_after_contiguous_gap_frame() -> None:
+    events: list[str] = []
+    service, _, _, _, _, _ = service_with_real_energy(events)
+    first = canonical_payload()
+    first["sequence"] = 10
+    first["uptime_ms"] = 1000
+    second = copy.deepcopy(first)
+    second["sequence"] = 11
+    second["uptime_ms"] = 1500
+    gap = copy.deepcopy(second)
+    gap["sequence"] = 20
+    gap["uptime_ms"] = 10000
+    resumed = copy.deepcopy(gap)
+    resumed["sequence"] = 21
+    resumed["uptime_ms"] = 10500
+    received_at = datetime(2026, 8, 23, 12, 0, tzinfo=UTC)
+
+    await service.handle_raw(first, "biovolt-01", received_at)
+    before_gap = await service.handle_raw(second, "biovolt-01", received_at)
+    first_after_gap = await service.handle_raw(gap, "biovolt-01", received_at)
+    resumed_processed = await service.handle_raw(resumed, "biovolt-01", received_at)
+
+    power = power_uw(438.2, 100_000.0)
+    assert first_after_gap.electrical.cumulative_energy_mj == pytest.approx(
+        before_gap.electrical.cumulative_energy_mj
+    )
+    assert resumed_processed.electrical.cumulative_energy_mj == pytest.approx(
+        before_gap.electrical.cumulative_energy_mj + power * 0.5 / 1000.0
+    )
+
+
+async def test_handle_raw_reboot_resets_energy_and_anchors_new_boot() -> None:
+    events: list[str] = []
+    service, _, _, _, _, _ = service_with_real_energy(events)
+    first = canonical_payload()
+    first["sequence"] = 10
+    first["uptime_ms"] = 1000
+    second = copy.deepcopy(first)
+    second["sequence"] = 11
+    second["uptime_ms"] = 1500
+    reboot = copy.deepcopy(second)
+    reboot["sequence"] = 0
+    reboot["uptime_ms"] = 100
+    received_at = datetime(2026, 8, 23, 12, 0, tzinfo=UTC)
+
+    await service.handle_raw(first, "biovolt-01", received_at)
+    await service.handle_raw(second, "biovolt-01", received_at)
+    processed = await service.handle_raw(reboot, "biovolt-01", received_at)
+
+    assert processed.electrical.cumulative_energy_mj == 0.0
 
 
 async def test_handle_raw_rejects_mismatched_authenticated_device_before_fanout() -> None:
@@ -406,6 +466,7 @@ async def test_handle_raw_rejects_cumulative_energy_overflow_without_poisoning_s
     payload["electrical"]["bpv_voltage_mv"] = 1e154  # type: ignore[index]
     first = payload.copy()
     first["uptime_ms"] = 0
+    first["sequence"] = 1
     received_at = datetime(2026, 8, 23, 12, 0, tzinfo=UTC)
 
     await service.handle_raw(first, "biovolt-01", received_at)
@@ -415,6 +476,7 @@ async def test_handle_raw_rejects_cumulative_energy_overflow_without_poisoning_s
 
     overflowing = payload.copy()
     overflowing["uptime_ms"] = 2**63 - 1
+    overflowing["sequence"] = 2
     with pytest.raises(TelemetryRejected, match="cumulative energy overflow"):
         await service.handle_raw(overflowing, "biovolt-01", received_at)
 
@@ -424,6 +486,7 @@ async def test_handle_raw_rejects_cumulative_energy_overflow_without_poisoning_s
 
     subsequent = payload.copy()
     subsequent["uptime_ms"] = 1000
+    subsequent["sequence"] = 2
     processed = await service.handle_raw(subsequent, "biovolt-01", received_at)
 
     assert processed.electrical.cumulative_energy_mj == pytest.approx(1e300)

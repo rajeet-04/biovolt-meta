@@ -37,6 +37,15 @@ def test_duplicate_uptime_updates_power_without_adding_energy() -> None:
     assert acc.update("d1", "c1", 2000, 20.0) == pytest.approx(0.03)
 
 
+def test_anchor_preserves_energy_and_skips_unobserved_interval() -> None:
+    acc = EnergyAccumulator()
+
+    acc.update("d1", "c1", 0, 10.0)
+    assert acc.update("d1", "c1", 1000, 10.0) == pytest.approx(0.010)
+    assert acc.anchor("d1", "c1", 10000, 20.0) == pytest.approx(0.010)
+    assert acc.update("d1", "c1", 11000, 20.0) == pytest.approx(0.030)
+
+
 def test_none_power_gaps_advance_state_without_adding_energy() -> None:
     acc = EnergyAccumulator()
     acc.update("d1", "c1", 0, 10.0)

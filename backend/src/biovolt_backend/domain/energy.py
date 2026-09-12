@@ -48,5 +48,20 @@ class EnergyAccumulator:
         self._states[key] = _EnergyState(uptime_ms, power_uw, cumulative_mj)
         return cumulative_mj
 
+    def anchor(
+        self,
+        device_id: str,
+        cell_id: str,
+        uptime_ms: int,
+        power_uw: float | None,
+    ) -> float:
+        """Replace the integration anchor without adding unobserved energy."""
+
+        key = (device_id, cell_id)
+        previous = self._states.get(key)
+        cumulative_mj = previous.cumulative_mj if previous is not None else 0.0
+        self._states[key] = _EnergyState(uptime_ms, power_uw, cumulative_mj)
+        return cumulative_mj
+
     def reset(self, device_id: str, cell_id: str) -> None:
         self._states.pop((device_id, cell_id), None)
