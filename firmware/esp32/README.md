@@ -14,6 +14,14 @@ Responsibilities beginning in the firmware phase:
 
 Scientific derived values remain backend-owned.
 
+## Sensor placeholder mode
+
+The default `esp32dev` build defines `BIOVOLT_SIMULATED_SENSORS`, so firmware
+transport and backend integration can be exercised before the physical sensor
+bench is connected. It emits bounded, changing raw-like BPV, BPW34,
+temperature, and lux values with all health flags true. Remove that flag from
+`platformio.ini` for the real ADS1115, DS18B20, BH1750, and optical drivers.
+
 Phase 0 contains no firmware runtime code.
 
 Phase 3.1: PlatformIO project bootstrapped. See Build and test below.
@@ -52,6 +60,32 @@ pio test -e native
 # Open a serial monitor against a connected device.
 pio device monitor -b 115200
 ```
+
+## Real-device transport workflow
+
+The firmware uses the unchanged backend `/ws/device` endpoint and sends the
+same raw `device-telemetry.v1` envelope as the simulator. Wi-Fi and WebSocket
+reconnects run in the telemetry task; unsent frames are discarded and the
+sequence still advances every 500 ms. The device sends only these headers:
+
+```text
+X-BioVolt-Device-ID: <device_id>
+Authorization: Bearer <shared-token>
+```
+
+For a local run, stop the simulator and start only the backend, discover the
+actual laptop hotspot IP, provision that IP as `backend_host`, set the shared
+token, save, and reboot. Then verify:
+
+```bash
+docker compose stop simulator || true
+docker compose up -d backend
+curl http://localhost:8000/api/system/status
+curl "http://localhost:8000/api/telemetry/latest?device_id=biovolt-01&cell_id=cell-a"
+```
+
+Backend-derived current, power, and optical values remain owned by the server;
+the firmware never emits those fields.
 
 ## Module boundary (Phase 3.1)
 

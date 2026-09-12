@@ -11,6 +11,9 @@
 #include "runtime/ProvisioningTask.h"
 #include "runtime/RuntimeStateStore.h"
 #include "runtime/SensorTask.h"
+#include "network/DeviceWebSocket.h"
+#include "network/NetworkManager.h"
+#include "telemetry/TelemetryTask.h"
 
 #if __has_include("BuildSecrets.h")
 #include "BuildSecrets.h"
@@ -35,11 +38,14 @@ MixerDriver mixer;
 SafetyPolicy safetyPolicy({});
 ActuatorController actuatorController(growLight, mixer, safetyPolicy);
 RuntimeStateStore runtimeState;
+NetworkManager networkManager;
+DeviceWebSocket deviceWebSocket;
 QueueHandle_t actuatorQueue = nullptr;
 SensorTaskContext sensorTaskContext{&sensorManager, &runtimeState};
 ControlTaskContext controlTaskContext{&runtimeState, nullptr};
 ActuatorTaskContext actuatorTaskContext{&actuatorController, &runtimeState, nullptr};
 ProvisioningTaskContext provisioningTaskContext{&provisioner};
+TelemetryTaskContext telemetryTaskContext{&runtimeState, &networkManager, &deviceWebSocket, &activeConfig};
 
 RuntimeConfig buildFallbackConfig() {
   RuntimeConfig config;
@@ -72,6 +78,8 @@ void setup() {
   configStore.begin();
   activeConfig = configStore.load(fallback);
   provisioner.begin(activeConfig, configStore);
+  networkManager.begin(activeConfig);
+  deviceWebSocket.begin(activeConfig);
   safetyPolicy.setLimits(SafetyLimits{activeConfig.ledPwmMin, activeConfig.ledPwmMax,
                                       static_cast<uint32_t>(activeConfig.mixerMaxRuntimeS) * 1000U,
                                       static_cast<uint32_t>(activeConfig.mixerCooldownS) * 1000U});
@@ -99,7 +107,10 @@ void setup() {
                                                            &actuatorTaskContext, 3, nullptr, 1);
   const BaseType_t provisioningTask = xTaskCreate(provisioningTaskEntry, "provision", 3072,
                                                   &provisioningTaskContext, 1, nullptr);
-  if (sensorTask != pdPASS || controlTask != pdPASS || actuatorTask != pdPASS || provisioningTask != pdPASS) {
+  const BaseType_t telemetryTask = xTaskCreatePinnedToCore(telemetryTaskEntry, "telemetry", 6144,
+                                                            &telemetryTaskContext, 2, nullptr, 1);
+  if (sensorTask != pdPASS || controlTask != pdPASS || actuatorTask != pdPASS ||
+      provisioningTask != pdPASS || telemetryTask != pdPASS) {
     Serial.println("Runtime task creation failed; outputs remain safe");
     setActuatorsSafe();
   }
