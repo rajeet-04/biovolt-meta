@@ -1,10 +1,10 @@
-# Phase 3.5: FreeRTOS Runtime, Shared State, and Task Isolation Implementation Plan
+# Phase 3.5: FreeRTOS Runtime, Shared State, Task Isolation, and Provisioning Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Run sensing, control, actuator application, and networking as isolated FreeRTOS responsibilities so temporary network stalls cannot stop hardware acquisition or safety enforcement.
+**Goal:** Run sensing, control, actuator application, and serial provisioning as isolated FreeRTOS responsibilities so network or serial activity cannot stop hardware acquisition or safety enforcement.
 
-**Architecture:** `RuntimeStateStore` owns the latest coherent sensor/control/actuator snapshot behind a mutex. `SensorTask` samples at 500 ms using `vTaskDelayUntil`. `ControlTask` runs the Phase 3 non-adaptive baseline and writes a one-slot actuator request queue. `ActuatorTask` applies queued requests and independently enforces mixer timeouts. Networking arrives in Module 3.6 as a separate task consuming snapshots.
+**Architecture:** Shared `RuntimeSnapshot` DTOs live in `lib/BioVoltCore/RuntimeTypes.h` so telemetry serialization can be tested natively. `RuntimeStateStore` owns the latest coherent sensor/control/actuator snapshot behind a mutex. SensorTask and ControlTask use drift-resistant 500 ms schedules. ActuatorTask consumes a one-slot latest-request queue and enforces timeouts independently. ProvisioningTask keeps the serial CLI available after Arduino `loop()` becomes idle. Network/TelemetryTask is added in Module 3.6.
 
 **Tech Stack:** ESP32 FreeRTOS, queues, mutexes, `esp_timer_get_time()`.
 
@@ -12,17 +12,70 @@
 
 ## Global Constraints
 
-- No task may hold the runtime-state mutex while doing I2C, GPIO, serial, or network I/O.
-- Sensor cadence target is 500 ms.
-- Use `vTaskDelayUntil`, not repeated `delay(500)`.
-- Control cadence target is 500 ms.
+- No task holds the runtime-state mutex while doing I2C, GPIO, serial, or network I/O.
+- Sensor cadence target is 500 ms using `vTaskDelayUntil`.
+- Control cadence target is 500 ms using `vTaskDelayUntil`.
 - Actuator timeout enforcement runs at least every 100 ms.
-- Task communication uses snapshots and queues, not mutable global structs.
-- Phase 3 control output remains Monitor mode, optimizer direction 0.
+- Task communication uses copied snapshots and queues, not mutable cross-task globals.
+- Phase 3 control remains `monitor`, optimizer direction `0`, PWM `0`, mixer OFF.
+- Active `RuntimeConfig` is immutable for the boot session.
+- Provisioning edits/saves only a draft configuration and requires reboot to apply.
+- Arduino `loop()` contains no application logic after tasks start.
 
 ---
 
-### Task 1: Implement thread-safe runtime state store
+### Task 1: Move RuntimeSnapshot into the native-testable core
+
+**Files:**
+- Modify: `firmware/esp32/lib/BioVoltCore/RuntimeTypes.h`
+- Modify: `firmware/esp32/test/test_core_types/test_main.cpp`
+
+**Interfaces:**
+
+```cpp
+struct ActuatorState {
+  uint8_t growLedPwm{0};
+  bool mixerOn{false};
+};
+
+enum class ControlMode { Monitor, Passive, Adaptive, Manual };
+
+struct ControlState {
+  ControlMode mode{ControlMode::Monitor};
+  int8_t optimizerDirection{0};
+};
+
+struct RuntimeSnapshot {
+  SensorFrame sensors;
+  ActuatorState actuators;
+  ControlState control;
+  uint64_t sampledAtMs{0};
+};
+```
+
+- [ ] **Step 1: Add failing default-state test**
+
+Assert a new RuntimeSnapshot has invalid/default sensor frame, PWM 0, mixer false, Monitor mode, and optimizer direction 0.
+
+- [ ] **Step 2: Implement DTOs without Arduino dependencies**
+
+- [ ] **Step 3: Run native tests**
+
+```bash
+cd firmware/esp32
+pio test -e native -f test_core_types
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add lib/BioVoltCore/RuntimeTypes.h test/test_core_types
+git commit -m "feat: define native-testable BioVolt runtime snapshot"
+```
+
+---
+
+### Task 2: Implement thread-safe RuntimeStateStore
 
 **Files:**
 - Create: `firmware/esp32/src/runtime/RuntimeStateStore.h`
@@ -31,13 +84,6 @@
 **Interfaces:**
 
 ```cpp
-struct RuntimeSnapshot {
-  SensorFrame sensors;
-  ActuatorState actuators;
-  ControlState control;
-  uint64_t sampledAtMs{0};
-};
-
 class RuntimeStateStore {
  public:
   bool begin();
@@ -50,28 +96,23 @@ class RuntimeStateStore {
 
 - [ ] **Step 1: Create mutex in `begin()`**
 
-Return false when mutex allocation fails so startup can fail safely.
+Return false if allocation fails so startup can remain safe/degraded.
 
-- [ ] **Step 2: Keep lock scopes copy-only**
+- [ ] **Step 2: Keep critical sections copy-only**
 
-Acquire mutex, copy struct, release immediately.
+Acquire mutex, copy/replace small structs, release immediately. Do not call drivers while locked.
 
-- [ ] **Step 3: Build firmware**
+- [ ] **Step 3: Build and commit**
 
 ```bash
 pio run -e esp32dev
-```
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add firmware/esp32/src/runtime/RuntimeStateStore.*
+git add src/runtime/RuntimeStateStore.*
 git commit -m "feat: add thread-safe BioVolt runtime state store"
 ```
 
 ---
 
-### Task 2: Implement SensorTask with drift-resistant 500 ms schedule
+### Task 3: Implement SensorTask with drift-resistant schedule
 
 **Files:**
 - Create: `firmware/esp32/src/runtime/SensorTask.h`
@@ -88,34 +129,33 @@ struct SensorTaskContext {
 void sensorTaskEntry(void* context);
 ```
 
-- [ ] **Step 1: Use `TickType_t lastWake = xTaskGetTickCount()`**
-
-Loop:
+- [ ] **Step 1: Use `vTaskDelayUntil`**
 
 ```cpp
+TickType_t lastWake = xTaskGetTickCount();
 for (;;) {
   const uint64_t nowMs = esp_timer_get_time() / 1000ULL;
-  auto frame = ctx->sensors->sample(nowMs);
+  const SensorFrame frame = ctx->sensors->sample(nowMs);
   ctx->state->updateSensors(frame, nowMs);
   vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(500));
 }
 ```
 
-- [ ] **Step 2: Add serial cadence diagnostic behind compile flag**
+- [ ] **Step 2: Add bounded timing diagnostic**
 
-When `BIOVOLT_DEBUG_TASK_TIMING` is defined, print measured loop deltas once every 20 cycles, not every sample.
+With `BIOVOLT_DEBUG_TASK_TIMING`, print measured cycle delta once every 20 cycles only.
 
 - [ ] **Step 3: Build and commit**
 
 ```bash
 pio run -e esp32dev
-git add firmware/esp32/src/runtime/SensorTask.*
+git add src/runtime/SensorTask.*
 git commit -m "feat: sample BioVolt sensors on a 500 ms FreeRTOS task"
 ```
 
 ---
 
-### Task 3: Implement one-slot actuator request queue and ControlTask
+### Task 4: Implement one-slot actuator queue and ControlTask
 
 **Files:**
 - Create: `firmware/esp32/src/runtime/ControlTask.h`
@@ -132,36 +172,38 @@ struct ControlTaskContext {
 void controlTaskEntry(void* context);
 ```
 
-- [ ] **Step 1: Allocate queue length 1 for `ActuatorRequest`**
+- [ ] **Step 1: Allocate queue length 1**
 
-Use `xQueueCreate(1, sizeof(ActuatorRequest))`.
+```cpp
+xQueueCreate(1, sizeof(ActuatorRequest));
+```
 
-- [ ] **Step 2: Run at 500 ms**
+- [ ] **Step 2: Run fixed Phase 3 baseline every 500 ms**
 
 Each cycle:
 
 ```text
-build phase3 control state
+ControlState = Monitor / optimizer 0
+ActuatorRequest = PWM 0 / mixer false
 update runtime control state
-build safe default actuator request
-xQueueOverwrite latest request
+xQueueOverwrite latest actuator request
 ```
 
-- [ ] **Step 3: Explicitly set optimizer direction to zero**
+- [ ] **Step 3: Do not create placeholder optimizer calls**
 
-Do not create a placeholder optimizer function.
+No P&O interface or fake adaptive branch belongs here.
 
 - [ ] **Step 4: Build and commit**
 
 ```bash
 pio run -e esp32dev
-git add firmware/esp32/src/runtime/ControlTask.*
+git add src/runtime/ControlTask.*
 git commit -m "feat: run BioVolt control baseline in isolated FreeRTOS task"
 ```
 
 ---
 
-### Task 4: Implement ActuatorTask
+### Task 5: Implement ActuatorTask
 
 **Files:**
 - Create: `firmware/esp32/src/runtime/ActuatorTask.h`
@@ -179,48 +221,94 @@ struct ActuatorTaskContext {
 void actuatorTaskEntry(void* context);
 ```
 
-- [ ] **Step 1: Poll queue with maximum 100 ms wait**
+- [ ] **Step 1: Wait at most 100 ms for request**
 
-If request arrives, apply it. If no request arrives, still call `enforceTimeouts(nowMs)`.
+On request, apply through ActuatorController. On timeout/no request, still call `enforceTimeouts(nowMs)`.
 
-- [ ] **Step 2: Update runtime state with actual applied outputs**
+- [ ] **Step 2: Publish actual applied state**
 
-Never publish requested state when safety policy rejected/clamped it.
+Never report requested PWM/mixer when safety policy clamped or rejected it.
 
 - [ ] **Step 3: Build and commit**
 
 ```bash
 pio run -e esp32dev
-git add firmware/esp32/src/runtime/ActuatorTask.*
+git add src/runtime/ActuatorTask.*
 git commit -m "feat: isolate BioVolt actuator application and timeout enforcement"
 ```
 
 ---
 
-### Task 5: Wire task startup in `main.cpp`
+### Task 6: Implement low-priority ProvisioningTask
+
+**Files:**
+- Create: `firmware/esp32/src/runtime/ProvisioningTask.h`
+- Create: `firmware/esp32/src/runtime/ProvisioningTask.cpp`
+
+**Interfaces:**
+
+```cpp
+struct ProvisioningTaskContext {
+  SerialProvisioner* provisioner;
+};
+
+void provisioningTaskEntry(void* context);
+```
+
+- [ ] **Step 1: Poll serial provisioner continuously**
+
+```cpp
+for (;;) {
+  ctx->provisioner->poll();
+  vTaskDelay(pdMS_TO_TICKS(20));
+}
+```
+
+- [ ] **Step 2: Use low priority**
+
+Recommended priority `1`, stack `3072`. Serial provisioning must not preempt sensor/actuator timing unnecessarily.
+
+- [ ] **Step 3: Confirm saved config does not mutate active tasks**
+
+After `config save`, running Wi-Fi/device ID remain unchanged until explicit reboot.
+
+- [ ] **Step 4: Build and commit**
+
+```bash
+pio run -e esp32dev
+git add src/runtime/ProvisioningTask.*
+git commit -m "feat: keep BioVolt serial provisioning available during runtime"
+```
+
+---
+
+### Task 7: Wire Phase 3.5 task startup in main.cpp
 
 **Files:**
 - Modify: `firmware/esp32/src/main.cpp`
 
-Recommended priorities/stacks:
+Recommended task allocation:
 
 ```text
-SensorTask    priority 3, stack 4096
-ControlTask   priority 3, stack 3072
-ActuatorTask  priority 3, stack 3072
+SensorTask        priority 3, stack 4096, core 1
+ControlTask       priority 3, stack 3072, core 1
+ActuatorTask      priority 3, stack 3072, core 1
+ProvisioningTask  priority 1, stack 3072, core 1 or unpinned
 ```
 
-Pin application hardware tasks to core 1. Keep Wi-Fi/network task creation for Module 3.6.
+TelemetryTask is added separately in Module 3.6.
 
-- [ ] **Step 1: Initialize state, sensors, actuators, queue before starting tasks**
+- [ ] **Step 1: Force hardware outputs safe before task creation**
 
-If mandatory runtime primitives fail, keep outputs safe and do not start partially initialized actuator tasks.
+- [ ] **Step 2: Initialize immutable active config, state store, sensors, actuators, queue, and provisioner**
 
-- [ ] **Step 2: Create tasks with checked return codes**
+If config is invalid, do not start network later, but keep safe sensor bench operation and ProvisioningTask available.
 
-Print task name on failure and remain in safe degraded mode.
+- [ ] **Step 3: Create each task with checked return code**
 
-- [ ] **Step 3: Make Arduino `loop()` idle**
+On mandatory hardware-task creation failure, keep outputs safe and print only task name/error.
+
+- [ ] **Step 4: Keep Arduino loop idle**
 
 ```cpp
 void loop() {
@@ -228,22 +316,25 @@ void loop() {
 }
 ```
 
-- [ ] **Step 4: Upload and inspect timing for at least 5 minutes**
+- [ ] **Step 5: Upload and inspect 5-minute timing**
 
-Sensor timing should remain close to 500 ms without cumulative drift.
+Sensor/control schedules should remain near 500 ms without cumulative drift, while `status` and config commands continue working over serial.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add firmware/esp32/src/main.cpp firmware/esp32/src/runtime
+git add src/main.cpp src/runtime
 git commit -m "feat: run BioVolt hardware responsibilities as FreeRTOS tasks"
 ```
 
 ## Module 3.5 Exit Criteria
 
-- [ ] Sensor/control/actuator responsibilities are isolated.
-- [ ] Runtime-state lock never wraps physical/network I/O.
-- [ ] Sensor/control schedules use `vTaskDelayUntil`.
-- [ ] Actuator timeout enforcement continues even if ControlTask has no new request.
+- [ ] RuntimeSnapshot is native-testable and shared with serializer.
+- [ ] Sensor/control/actuator/provisioning responsibilities are isolated.
+- [ ] Runtime-state mutex never wraps I/O.
+- [ ] Sensor/control use `vTaskDelayUntil`.
+- [ ] Actuator timeout enforcement continues without fresh control requests.
+- [ ] Provisioning remains usable after application tasks start.
+- [ ] Saved draft configuration applies only after reboot.
 - [ ] Published actuator state is actual applied state.
 - [ ] Arduino `loop()` contains no application logic.
