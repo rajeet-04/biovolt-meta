@@ -39,10 +39,14 @@ def build_processed_telemetry(
     voltage_mv = raw.electrical.bpv_voltage_mv
     current = current_ua(voltage_mv, config.load_resistance_ohm) if voltage_mv is not None else None
     power = power_uw(voltage_mv, config.load_resistance_ohm) if voltage_mv is not None else None
-    od680 = calculate_od680(
-        raw.optical.bpw34_raw,
-        config.bpw34_dark_raw,
-        config.bpw34_blank_raw,
+    od680 = (
+        calculate_od680(
+            raw.optical.bpw34_raw,
+            config.bpw34_dark_raw,
+            config.bpw34_blank_raw,
+        )
+        if raw.optical.led_680_enabled and raw.health.bpw34_ok
+        else None
     )
 
     return ProcessedTelemetryV1(
