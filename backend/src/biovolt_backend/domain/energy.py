@@ -1,5 +1,6 @@
 """Boot-session energy accumulation for telemetry samples."""
 
+import math
 from dataclasses import dataclass
 
 
@@ -35,9 +36,14 @@ class EnergyAccumulator:
             and previous.power_uw is not None
             and power_uw is not None
         ):
-            elapsed_s = (uptime_ms - previous.uptime_ms) / 1000.0
-            average_power_uw = (previous.power_uw + power_uw) / 2.0
-            cumulative_mj += average_power_uw * elapsed_s / 1000.0
+            try:
+                elapsed_s = (uptime_ms - previous.uptime_ms) / 1000.0
+                average_power_uw = (previous.power_uw + power_uw) / 2.0
+                cumulative_mj += average_power_uw * elapsed_s / 1000.0
+            except OverflowError as exc:
+                raise OverflowError("cumulative energy overflow") from exc
+            if not math.isfinite(cumulative_mj):
+                raise OverflowError("cumulative energy overflow")
 
         self._states[key] = _EnergyState(uptime_ms, power_uw, cumulative_mj)
         return cumulative_mj

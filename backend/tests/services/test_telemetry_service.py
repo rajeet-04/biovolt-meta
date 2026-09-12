@@ -7,6 +7,7 @@ import pytest
 import biovolt_backend.services.telemetry_service as telemetry_service_module
 from biovolt_backend.contracts.loader import validate_payload as real_validate_payload
 from biovolt_backend.contracts.models import DeviceTelemetryV1, ProcessedTelemetryV1
+from biovolt_backend.domain.energy import EnergyAccumulator
 from biovolt_backend.domain.processing import ProcessingConfig
 from biovolt_backend.services.telemetry_service import TelemetryRejected, TelemetryService
 
@@ -295,3 +296,52 @@ async def test_handle_raw_rejects_storage_unsafe_integers_before_side_effects(
     assert repository.calls == []
     assert hub.payloads == []
     assert registry.calls == []
+
+
+async def test_handle_raw_rejects_cumulative_energy_overflow_without_poisoning_state() -> None:
+    events: list[str] = []
+    energy = EnergyAccumulator()
+    throttle = FakeThrottle(events)
+    repository = FakeRepository(events)
+    hub = FakeHub(events)
+    registry = FakeRegistry(events)
+    service = TelemetryService(
+        config=ProcessingConfig(
+            load_resistance_ohm=100_000.0,
+            bpw34_dark_raw=320,
+            bpw34_blank_raw=23_840,
+        ),
+        energy=energy,
+        throttle=throttle,
+        repository=repository,
+        dashboard_hub=hub,
+        device_registry=registry,
+    )
+    payload = canonical_payload()
+    payload["electrical"]["bpv_voltage_mv"] = 1e154  # type: ignore[index]
+    first = payload.copy()
+    first["uptime_ms"] = 0
+    received_at = datetime(2026, 8, 23, 12, 0, tzinfo=UTC)
+
+    await service.handle_raw(first, "biovolt-01", received_at)
+    repository_count = len(repository.calls)
+    broadcast_count = len(hub.payloads)
+    registry_count = len(registry.calls)
+
+    overflowing = payload.copy()
+    overflowing["uptime_ms"] = 2**63 - 1
+    with pytest.raises(TelemetryRejected, match="cumulative energy overflow"):
+        await service.handle_raw(overflowing, "biovolt-01", received_at)
+
+    assert len(repository.calls) == repository_count
+    assert len(hub.payloads) == broadcast_count
+    assert len(registry.calls) == registry_count
+
+    subsequent = payload.copy()
+    subsequent["uptime_ms"] = 1000
+    processed = await service.handle_raw(subsequent, "biovolt-01", received_at)
+
+    assert processed.electrical.cumulative_energy_mj == pytest.approx(1e300)
+    assert len(repository.calls) == repository_count + 1
+    assert len(hub.payloads) == broadcast_count + 1
+    assert len(registry.calls) == registry_count + 1

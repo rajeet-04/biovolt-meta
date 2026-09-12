@@ -46,3 +46,13 @@ def test_reset_discards_state_for_one_cell() -> None:
 
     assert acc.update("d1", "c1", 2000, 10.0) == 0.0
     assert acc.update("d1", "c2", 1000, 10.0) == 0.0
+
+
+def test_energy_overflow_is_atomic_and_does_not_poison_prior_state() -> None:
+    acc = EnergyAccumulator()
+    acc.update("d1", "c1", 0, 1e303)
+
+    with pytest.raises(OverflowError, match="cumulative energy overflow"):
+        acc.update("d1", "c1", 2**63 - 1, 1e303)
+
+    assert acc.update("d1", "c1", 1000, 1e303) == pytest.approx(1e300)

@@ -104,12 +104,17 @@ class TelemetryService:
             if voltage_mv is not None
             else None
         )
-        energy_mj = self._energy.update(
-            raw.device_id,
-            raw.cell_id,
-            raw.uptime_ms,
-            measured_power_uw,
-        )
+        try:
+            energy_mj = self._energy.update(
+                raw.device_id,
+                raw.cell_id,
+                raw.uptime_ms,
+                measured_power_uw,
+            )
+        except OverflowError as exc:
+            raise TelemetryRejected("cumulative energy overflow") from exc
+        if not math.isfinite(energy_mj):
+            raise TelemetryRejected("cumulative energy overflow")
         processed = build_processed_telemetry(
             raw,
             timestamp=received_at,
