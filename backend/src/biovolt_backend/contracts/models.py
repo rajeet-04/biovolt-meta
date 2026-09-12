@@ -1,0 +1,119 @@
+from typing import Literal
+
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+
+
+class ElectricalRaw(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    bpv_voltage_mv: float | None
+    bpv_adc_raw: int | None = Field(ge=-32768, le=32767)
+
+
+class OpticalRaw(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    bpw34_raw: int | None = Field(ge=-32768, le=32767)
+    bpw34_voltage_mv: float | None
+    led_680_enabled: bool
+
+
+class EnvironmentRaw(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    temperature_c: float | None = Field(ge=-55, le=125)
+    lux: float | None = Field(ge=0)
+
+
+class ActuatorStateRaw(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    grow_led_pwm: int = Field(ge=0, le=255)
+    mixer_on: bool
+
+
+class ControlStateRaw(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["monitor", "passive", "adaptive", "manual"]
+    optimizer_direction: Literal[-1, 0, 1]
+
+
+class HealthStateRaw(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ads1115_ok: bool
+    bpw34_ok: bool
+    temperature_ok: bool
+    light_sensor_ok: bool
+
+
+class DeviceTelemetryV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1]
+    device_id: str = Field(min_length=1, max_length=64)
+    sequence: int = Field(ge=0)
+    uptime_ms: int = Field(ge=0)
+    cell_id: str = Field(min_length=1, max_length=64)
+    electrical: ElectricalRaw
+    optical: OpticalRaw
+    environment: EnvironmentRaw
+    actuators: ActuatorStateRaw
+    control: ControlStateRaw
+    health: HealthStateRaw
+
+
+class ElectricalProcessed(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    voltage_mv: float | None
+    current_ua: float | None
+    power_uw: float | None
+    load_resistance_ohm: float = Field(gt=0)
+    cumulative_energy_mj: float | None = Field(ge=0)
+
+
+class BiologicalProcessed(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    od680: float | None = Field(ge=0)
+    biomass_g_l: float | None = Field(ge=0)
+    biomass_total_g: float | None = Field(ge=0)
+    biomass_delta_g: float | None
+    co2_biofixed_g: float | None = Field(ge=0)
+
+
+class EnvironmentProcessed(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    temperature_c: float | None
+    lux: float | None = Field(ge=0)
+
+
+class ActuatorStateProcessed(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    grow_led_pwm: int = Field(ge=0, le=255)
+    mixer_on: bool
+
+
+class ControlStateProcessed(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["monitor", "passive", "adaptive", "manual"]
+
+
+class ProcessedTelemetryV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1]
+    device_id: str = Field(min_length=1, max_length=64)
+    cell_id: str = Field(min_length=1, max_length=64)
+    sequence: int = Field(ge=0)
+    timestamp: AwareDatetime
+    electrical: ElectricalProcessed
+    biological: BiologicalProcessed
+    environment: EnvironmentProcessed
+    actuators: ActuatorStateProcessed
+    control: ControlStateProcessed
