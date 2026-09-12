@@ -26,6 +26,21 @@ void test_sensor_snapshot_defaults_invalid() {
   TEST_ASSERT_FALSE(s.lux.valid);
 }
 
+void test_sensor_frame_health_defaults_false() {
+  SensorFrame frame;
+  TEST_ASSERT_FALSE(frame.health.ads1115Ok);
+  TEST_ASSERT_FALSE(frame.health.bpw34Ok);
+  TEST_ASSERT_FALSE(frame.health.temperatureOk);
+  TEST_ASSERT_FALSE(frame.health.lightSensorOk);
+}
+
+void test_analog_sample_defaults_invalid() {
+  AnalogSample sample;
+  TEST_ASSERT_FALSE(sample.valid);
+  TEST_ASSERT_EQUAL_INT16(0, sample.raw);
+  TEST_ASSERT_EQUAL_FLOAT(0.0F, sample.millivolts);
+}
+
 void test_actuator_state_defaults_off() {
   ActuatorState a;
   TEST_ASSERT_EQUAL_UINT8(0, a.growLedPwm);
@@ -46,6 +61,8 @@ int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_sensor_value_default_is_invalid);
   RUN_TEST(test_sensor_snapshot_defaults_invalid);
+  RUN_TEST(test_sensor_frame_health_defaults_false);
+  RUN_TEST(test_analog_sample_defaults_invalid);
   RUN_TEST(test_actuator_state_defaults_off);
   RUN_TEST(test_control_mode_monitor_is_first);
   RUN_TEST(test_control_state_defaults_monitor_zero);

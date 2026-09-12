@@ -4,6 +4,7 @@
 #include "ConfigValidation.h"
 #include "config/ConfigStore.h"
 #include "provisioning/SerialProvisioner.h"
+#include "sensors/SensorManager.h"
 
 #if __has_include("BuildSecrets.h")
 #include "BuildSecrets.h"
@@ -22,6 +23,8 @@ namespace {
 ConfigStore configStore;
 RuntimeConfig activeConfig;
 SerialProvisioner provisioner;
+SensorManager sensorManager;
+uint64_t lastSensorSampleMs = 0;
 
 RuntimeConfig buildFallbackConfig() {
   RuntimeConfig config;
@@ -54,6 +57,7 @@ void setup() {
   configStore.begin();
   activeConfig = configStore.load(fallback);
   provisioner.begin(activeConfig, configStore);
+  sensorManager.begin();
 
   if (!validateRuntimeConfig(activeConfig).valid) {
     Serial.println("Configuration invalid; actuators remain off and serial provisioning is available");
@@ -66,5 +70,10 @@ void setup() {
 
 void loop() {
   provisioner.poll();
+  const uint64_t nowMs = millis();
+  if (nowMs - lastSensorSampleMs >= 500) {
+    lastSensorSampleMs = nowMs;
+    sensorManager.sample(nowMs);
+  }
   vTaskDelay(pdMS_TO_TICKS(10));
 }
