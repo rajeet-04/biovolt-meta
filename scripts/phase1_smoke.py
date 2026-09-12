@@ -93,9 +93,14 @@ def wait_for_device(
 
     deadline = time.monotonic() + timeout_seconds
     while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise SmokeFailure(f"device {device_id!r} did not connect before timeout")
         status = _require_mapping(
             fetch_json(
-                base_url, "/api/system/status", timeout_seconds=request_timeout_seconds
+                base_url,
+                "/api/system/status",
+                timeout_seconds=min(request_timeout_seconds, remaining),
             ),
             "/api/system/status",
         )
@@ -113,24 +118,31 @@ def _telemetry_query(device_id: str, cell_id: str) -> dict[str, str]:
 
 def run_smoke(args: argparse.Namespace) -> None:
     started = time.monotonic()
-    _require_health(args.base_url, args.request_timeout)
+    deadline = started + min(args.timeout, 29.0)
+
+    def remaining() -> float:
+        value = deadline - time.monotonic()
+        if value <= 0:
+            raise SmokeFailure("smoke checks exceeded the overall time limit")
+        return value
+
+    _require_health(args.base_url, min(args.request_timeout, remaining()))
     wait_for_device(
         args.base_url,
         args.device_id,
-        timeout_seconds=args.timeout,
+        timeout_seconds=remaining(),
         poll_seconds=args.poll_seconds,
-        request_timeout_seconds=args.request_timeout,
+        request_timeout_seconds=min(args.request_timeout, remaining()),
     )
 
     latest: Mapping[str, Any] | None = None
-    latest_deadline = time.monotonic() + args.timeout
-    while time.monotonic() < latest_deadline:
+    while time.monotonic() < deadline:
         try:
             latest = _require_mapping(
                 fetch_json(
                     args.base_url,
                     "/api/telemetry/latest",
-                    timeout_seconds=args.request_timeout,
+                    timeout_seconds=min(args.request_timeout, remaining()),
                     **_telemetry_query(args.device_id, args.cell_id),
                 ),
                 "/api/telemetry/latest",
@@ -139,7 +151,7 @@ def run_smoke(args: argparse.Namespace) -> None:
         except SmokeFailure as exc:
             if "HTTP 404" not in str(exc):
                 raise
-            time.sleep(args.poll_seconds)
+            time.sleep(min(args.poll_seconds, remaining()))
     if latest is None:
         raise SmokeFailure("latest telemetry did not become available before timeout")
 
@@ -147,11 +159,13 @@ def run_smoke(args: argparse.Namespace) -> None:
     if electrical.get("voltage_mv") is not None and electrical.get("power_uw") is None:
         raise SmokeFailure("latest telemetry has voltage but no derived power_uw")
 
+    if remaining() < args.settle_seconds:
+        raise SmokeFailure("not enough time remained for the history settling check")
     time.sleep(args.settle_seconds)
     history_value = fetch_json(
         args.base_url,
         "/api/telemetry/history",
-        timeout_seconds=args.request_timeout,
+        timeout_seconds=min(args.request_timeout, remaining()),
         limit=1000,
         **_telemetry_query(args.device_id, args.cell_id),
     )
@@ -182,7 +196,10 @@ def _parser() -> argparse.ArgumentParser:
         default=os.environ.get("BIOVOLT_SIM_CELL_ID", "cell-a"),
     )
     parser.add_argument(
-        "--timeout", type=float, default=20.0, help="connection wait limit"
+        "--timeout",
+        type=float,
+        default=20.0,
+        help="overall smoke limit in seconds (capped at 29)",
     )
     parser.add_argument("--poll-seconds", type=float, default=0.5)
     parser.add_argument("--settle-seconds", type=float, default=3.0)

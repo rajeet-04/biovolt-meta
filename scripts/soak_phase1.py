@@ -162,8 +162,6 @@ def run_soak(args: argparse.Namespace) -> None:
         if remaining <= 0:
             break
         time.sleep(min(max(0.0, next_check - time.monotonic()), remaining))
-        if time.monotonic() >= started + duration_seconds:
-            break
         count, window_rate = _check_once(args)
         if count < previous_count:
             raise SmokeFailure("history row count regressed")
@@ -174,6 +172,8 @@ def run_soak(args: argparse.Namespace) -> None:
         capped_rate = window_rate or capped_rate
         checks += 1
         print(f"check {checks}: history={count} latest age < {args.max_age_seconds:g}s")
+        if time.monotonic() >= started + duration_seconds:
+            break
         next_check += args.interval_seconds
 
     elapsed = time.monotonic() - started
