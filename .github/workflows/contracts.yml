@@ -1,0 +1,28 @@
+name: Contract Validation
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: requirements-contracts.txt
+
+      - name: Install contract dependencies
+        run: python -m pip install -r requirements-contracts.txt
+
+      - name: Validate canonical schemas
+        run: python scripts/validate_schemas.py
+
+      - name: Run contract tests
+        run: python -m pytest tests/contracts -v

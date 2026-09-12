@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://biovolt.local/schemas/device-telemetry.v1.schema.json",
+  "title": "BioVolt Device Telemetry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "device_id",
+    "sequence",
+    "uptime_ms",
+    "cell_id",
+    "electrical",
+    "optical",
+    "environment",
+    "actuators",
+    "control",
+    "health"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "device_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "sequence": {"type": "integer", "minimum": 0},
+    "uptime_ms": {"type": "integer", "minimum": 0},
+    "cell_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "electrical": {"$ref": "#/$defs/electrical"},
+    "optical": {"$ref": "#/$defs/optical"},
+    "environment": {"$ref": "#/$defs/environment"},
+    "actuators": {"$ref": "#/$defs/actuators"},
+    "control": {"$ref": "#/$defs/control"},
+    "health": {"$ref": "#/$defs/health"}
+  },
+  "$defs": {
+    "electrical": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bpv_voltage_mv", "bpv_adc_raw"],
+      "properties": {
+        "bpv_voltage_mv": {"type": ["number", "null"]},
+        "bpv_adc_raw": {
+          "type": ["integer", "null"],
+          "minimum": -32768,
+          "maximum": 32767
+        }
+      }
+    },
+    "optical": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bpw34_raw", "bpw34_voltage_mv", "led_680_enabled"],
+      "properties": {
+        "bpw34_raw": {
+          "type": ["integer", "null"],
+          "minimum": -32768,
+          "maximum": 32767
+        },
+        "bpw34_voltage_mv": {"type": ["number", "null"]},
+        "led_680_enabled": {"type": "boolean"}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["temperature_c", "lux"],
+      "properties": {
+        "temperature_c": {
+          "type": ["number", "null"],
+          "minimum": -55,
+          "maximum": 125
+        },
+        "lux": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "actuators": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["grow_led_pwm", "mixer_on"],
+      "properties": {
+        "grow_led_pwm": {"type": "integer", "minimum": 0, "maximum": 255},
+        "mixer_on": {"type": "boolean"}
+      }
+    },
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "optimizer_direction"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["monitor", "passive", "adaptive", "manual"]
+        },
+        "optimizer_direction": {"type": "integer", "enum": [-1, 0, 1]}
+      }
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ads1115_ok",
+        "bpw34_ok",
+        "temperature_ok",
+        "light_sensor_ok"
+      ],
+      "properties": {
+        "ads1115_ok": {"type": "boolean"},
+        "bpw34_ok": {"type": "boolean"},
+        "temperature_ok": {"type": "boolean"},
+        "light_sensor_ok": {"type": "boolean"}
+      }
+    }
+  }
+}
