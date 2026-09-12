@@ -57,6 +57,24 @@ they are defined, avoiding blank strings that strict Pydantic float settings
 cannot parse. Stop and restart services without `docker compose down -v` to
 keep persisted telemetry; `down -v` intentionally removes the named volume.
 
+The simulator is optional, disposable development infrastructure: it unblocks
+backend and frontend work before physical hardware is ready and is not needed
+for a real-device run. To switch from simulator to ESP32, stop only the
+simulator and leave FastAPI running:
+
+```bash
+docker compose stop simulator
+docker compose up -d backend
+```
+
+Configure the ESP32 for `ws://<laptop-hotspot-ip>:8000/ws/device` with a unique
+device ID and the configured shared token. It must send the same Phase 0
+`device-telemetry.v1` JSON schema and use the same authentication headers:
+`X-BioVolt-Device-ID: <device_id>` and `Authorization: Bearer <shared-token>`.
+The backend route, scientific processing, database, and dashboard contract do
+not change. The switchover does not require a simulator install, a simulator
+container in the demo, feature flags, or a second telemetry table.
+
 ## Phase 1 acceptance checks
 
 With the simulator profile running, execute the short smoke check followed by

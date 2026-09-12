@@ -4,6 +4,10 @@ This package emulates an ESP32 device so backend and frontend development can
 proceed without physical hardware. It emits deterministic telemetry using the
 shared `device-telemetry.v1` contract.
 
+The simulator is optional and disposable development infrastructure. It exists
+to unblock backend and frontend work before an ESP32 is available; it is not a
+production data source.
+
 ## Development setup
 
 ```bash
@@ -72,3 +76,26 @@ docker run --rm \
   -e BIOVOLT_SIM_DEVICE_TOKEN=replace-with-a-device-token \
   biovolt-simulator:phase1
 ```
+
+## Switchover to ESP32
+
+Stop the simulator while keeping the backend running:
+
+```bash
+docker compose stop simulator
+docker compose up -d backend
+```
+
+Configure the ESP32 to connect to
+`ws://<laptop-hotspot-ip>:8000/ws/device` with a unique device ID and the
+configured shared token. It must send the same Phase 0
+`device-telemetry.v1` JSON shape and authentication headers:
+
+```text
+X-BioVolt-Device-ID: <device_id>
+Authorization: Bearer <shared-token>
+```
+
+No simulator install or container, backend feature flag, second database table,
+or alternate endpoint is needed. FastAPI processing, persistence, and
+dashboard fanout remain unchanged.

@@ -60,3 +60,27 @@ that image layout and validate a canonical payload with:
 docker run --rm biovolt-backend:phase1 python -c \
   'import json; from pathlib import Path; from biovolt_backend.contracts.loader import validate_payload; payload=json.loads(Path("/app/shared/examples/device-telemetry.example.json").read_text()); validate_payload("device-telemetry.v1.schema.json", payload); print("contract validation: ok")'
 ```
+
+## Simulator and ESP32 switchover
+
+The simulator is an optional, disposable client for development before
+hardware is available. Run the backend without it for a real-device session:
+
+```bash
+docker compose stop simulator
+docker compose up -d backend
+```
+
+Configure the ESP32 to connect to
+`ws://<laptop-hotspot-ip>:8000/ws/device` using a unique device ID and the
+configured shared token. Hardware uses the same `device-telemetry.v1` schema
+and authentication headers as the simulator:
+
+```text
+X-BioVolt-Device-ID: <device_id>
+Authorization: Bearer <shared-token>
+```
+
+No backend feature flag, route, database table, scientific calculation, or
+frontend contract selects the source. A hardware run does not require the
+simulator package or container.
