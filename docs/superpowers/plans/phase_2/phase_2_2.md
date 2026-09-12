@@ -14,6 +14,7 @@
 
 - The frontend must consume processed telemetry and never raw ESP32 telemetry.
 - The frontend must not recalculate current, power, OD680, biomass, carbon, or energy.
+- TypeScript processed telemetry must match `shared/schemas/processed-telemetry.v1.schema.json`, including required `sequence` and nullable `cumulative_energy_mj`.
 - The runtime guard rejects structurally invalid WebSocket messages before store mutation.
 - The backend URL defaults to same-origin paths so later Nginx routing requires no frontend rewrite.
 - Vite development proxy may route `/api` and `/ws` to FastAPI.
@@ -36,13 +37,14 @@ export interface ProcessedTelemetryV1 {
   schema_version: 1
   device_id: string
   cell_id: string
+  sequence: number
   timestamp: string
   electrical: {
     voltage_mv: number | null
     current_ua: number | null
     power_uw: number | null
     load_resistance_ohm: number
-    cumulative_energy_mj: number
+    cumulative_energy_mj: number | null
   }
   biological: {
     od680: number | null
@@ -69,11 +71,11 @@ export interface ProcessedTelemetryV1 {
 
 - [ ] **Step 1: Write failing runtime-guard tests**
 
-Cover one valid processed payload and invalid cases for missing `device_id`, wrong `schema_version`, non-object `electrical`, and string-valued `power_uw`.
+Cover one valid processed payload and invalid cases for missing `device_id`, missing `sequence`, wrong `schema_version`, non-object `electrical`, and string-valued `power_uw`. Also verify `cumulative_energy_mj: null` is accepted because the Phase 0 schema allows unavailable cumulative energy.
 
 - [ ] **Step 2: Implement `isProcessedTelemetryV1(value: unknown): value is ProcessedTelemetryV1`**
 
-Use small reusable helpers such as `isRecord`, `isNullableNumber`, and exact control-mode checking. Do not coerce strings into numbers.
+Use small reusable helpers such as `isRecord`, `isNullableNumber`, and exact control-mode checking. Do not coerce strings into numbers. Validate `sequence` as a non-negative integer and `cumulative_energy_mj` as null or a non-negative finite number.
 
 - [ ] **Step 3: Add system-status interfaces**
 
@@ -114,7 +116,7 @@ export async function getTelemetryHistory(query: TelemetryHistoryQuery, signal?:
 
 - [ ] **Step 1: Write failing URL-construction tests**
 
-Verify query parameters are encoded exactly and history limit defaults to 100 when omitted by the caller or is intentionally omitted so backend default applies. Choose one behavior and document it. Recommended: omit unless caller specifies.
+Verify query parameters are encoded exactly. When `limit` is omitted by the caller, omit it from the request so the Phase 1 backend applies its documented default.
 
 - [ ] **Step 2: Implement `ApiError`**
 
@@ -187,7 +189,7 @@ Ingest 1,205 frames and assert only the newest 1,200 remain.
 
 - [ ] **Step 4: Implement store**
 
-Do not derive scientific values. Store exact backend payloads.
+Do not derive scientific values. Store exact backend payloads, including `sequence` and nullable cumulative energy.
 
 - [ ] **Step 5: Run and commit**
 
@@ -329,7 +331,9 @@ git commit -m "test: enforce source-neutral BioVolt frontend"
 
 ## Module 2.2 Exit Criteria
 
-- [ ] Processed telemetry and status are typed.
+- [ ] Processed telemetry and status are typed against Phase 0/1 field semantics.
+- [ ] Required `sequence` is preserved through frontend runtime state.
+- [ ] Nullable `cumulative_energy_mj` is accepted and displayed as unavailable when null.
 - [ ] Invalid WebSocket payloads never mutate store state.
 - [ ] REST client uses same-origin API paths.
 - [ ] Development proxy supports REST and WebSocket backend access.
