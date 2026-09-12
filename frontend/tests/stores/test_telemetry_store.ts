@@ -59,6 +59,18 @@ describe('useTelemetryStore', () => {
     expect(useTelemetryStore.getState().selectedSource).toBe('second::cell-a')
   })
 
+  it('keeps source identities distinct when identifiers contain the key separator', () => {
+    const first = frame(0, 'device::a', 'cell-b')
+    const second = frame(1, 'device', 'a::cell-b')
+
+    useTelemetryStore.getState().ingest(first)
+    useTelemetryStore.getState().ingest(second)
+
+    const sources = Object.values(useTelemetryStore.getState().sources)
+    expect(sources).toHaveLength(2)
+    expect(sources.map((source) => source.latest)).toEqual(expect.arrayContaining([first, second]))
+  })
+
   it('keeps only the newest 1,200 frames for each source', () => {
     for (let sequence = 0; sequence < 1_205; sequence += 1) {
       useTelemetryStore.getState().ingest(frame(sequence))

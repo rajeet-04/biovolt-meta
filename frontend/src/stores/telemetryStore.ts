@@ -22,7 +22,9 @@ export interface TelemetryStoreState {
 const LIVE_BUFFER_LIMIT = 1_200
 
 function sourceKey(frame: ProcessedTelemetryV1): SourceKey {
-  return `${frame.device_id}::${frame.cell_id}`
+  // Keep the readable key for ordinary identifiers while escaping separator
+  // characters inside either identifier so the pair remains injective.
+  return `${encodeURIComponent(frame.device_id)}::${encodeURIComponent(frame.cell_id)}`
 }
 
 export const useTelemetryStore = create<TelemetryStoreState>((set) => ({
