@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { isTelemetryStale } from '../../lib/stale'
 
 interface FreshnessBadgeProps {
@@ -8,8 +8,15 @@ interface FreshnessBadgeProps {
 }
 
 export function FreshnessBadge({ timestamp, nowMs, thresholdMs }: FreshnessBadgeProps) {
-  const [mountedAtMs] = useState(() => Date.now())
-  const stale = isTelemetryStale(timestamp, nowMs ?? mountedAtMs, thresholdMs)
+  const [clockMs, setClockMs] = useState(() => Date.now())
+
+  useEffect(() => {
+    if (nowMs !== undefined) return
+    const timer = window.setInterval(() => setClockMs(Date.now()), 250)
+    return () => window.clearInterval(timer)
+  }, [nowMs])
+
+  const stale = isTelemetryStale(timestamp, nowMs ?? clockMs, thresholdMs)
 
   return (
     <span
