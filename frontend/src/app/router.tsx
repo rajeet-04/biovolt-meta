@@ -4,6 +4,9 @@ import { ChartsPage } from '../pages/ChartsPage'
 import { LiveDataPage } from '../pages/LiveDataPage'
 import { OverviewPage } from '../pages/OverviewPage'
 import { SystemPage } from '../pages/SystemPage'
+import { ExperimentsPage } from '../pages/ExperimentsPage'
+import { ExperimentDetailPage } from '../pages/ExperimentDetailPage'
+import { ControlPage } from '../pages/ControlPage'
 
 export const appRoutes: RouteObject[] = [
   {
@@ -13,6 +16,9 @@ export const appRoutes: RouteObject[] = [
       { path: 'live', element: <LiveDataPage /> },
       { path: 'charts', element: <ChartsPage /> },
       { path: 'system', element: <SystemPage /> },
+      { path: 'experiments', element: <ExperimentsPage /> },
+      { path: 'experiments/:experimentId', element: <ExperimentDetailPage /> },
+      { path: 'control', element: <ControlPage /> },
     ],
   },
 ]

@@ -1,12 +1,14 @@
 import json
 import time
 
+from argon2 import PasswordHasher
 from fastapi.testclient import TestClient
 
 from biovolt_backend.config import Settings
 from biovolt_backend.main import create_app
 
 DEVICE_TOKEN = "test-token-123"
+OPERATOR_HASH = PasswordHasher().hash("2468")
 
 
 def test_acknowledgements_drive_experiment_running_and_reject_mismatched_device(tmp_path) -> None:
@@ -15,9 +17,11 @@ def test_acknowledgements_drive_experiment_running_and_reject_mismatched_device(
             environment="test",
             database_url=f"sqlite+aiosqlite:///{tmp_path / 'ack.db'}",
             device_shared_token=DEVICE_TOKEN,
+            operator_pin_hash=OPERATOR_HASH,
         )
     )
     with TestClient(app) as client:
+        client.post("/api/operator/login", json={"pin": "2468"})
         created = client.post(
             "/api/experiments",
             json={
@@ -96,6 +100,7 @@ def test_unknown_schema_is_rejected_without_mutating_telemetry(tmp_path) -> None
             environment="test",
             database_url=f"sqlite+aiosqlite:///{tmp_path / 'unknown.db'}",
             device_shared_token=DEVICE_TOKEN,
+            operator_pin_hash=OPERATOR_HASH,
         )
     )
     with TestClient(app) as client:
@@ -116,9 +121,11 @@ def test_required_rejection_aborts_experiment(tmp_path) -> None:
             environment="test",
             database_url=f"sqlite+aiosqlite:///{tmp_path / 'lifecycle.db'}",
             device_shared_token=DEVICE_TOKEN,
+            operator_pin_hash=OPERATOR_HASH,
         )
     )
     with TestClient(app) as client:
+        client.post("/api/operator/login", json={"pin": "2468"})
         created = client.post(
             "/api/experiments",
             json={
@@ -166,9 +173,11 @@ def test_safe_stop_ack_completes_running_experiment(tmp_path) -> None:
             environment="test",
             database_url=f"sqlite+aiosqlite:///{tmp_path / 'stop.db'}",
             device_shared_token=DEVICE_TOKEN,
+            operator_pin_hash=OPERATOR_HASH,
         )
     )
     with TestClient(app) as client:
+        client.post("/api/operator/login", json={"pin": "2468"})
         created = client.post(
             "/api/experiments",
             json={

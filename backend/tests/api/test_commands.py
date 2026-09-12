@@ -1,5 +1,6 @@
 import asyncio
 
+from argon2 import PasswordHasher
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -10,9 +11,14 @@ from biovolt_backend.main import create_app
 
 def test_command_status_is_read_only_and_safe(tmp_path) -> None:
     app = create_app(
-        Settings(environment="test", database_url=f"sqlite+aiosqlite:///{tmp_path / 'commands.db'}")
+        Settings(
+            environment="test",
+            database_url=f"sqlite+aiosqlite:///{tmp_path / 'commands.db'}",
+            operator_pin_hash=PasswordHasher().hash("2468"),
+        )
     )
     with TestClient(app) as client:
+        client.post("/api/operator/login", json={"pin": "2468"})
         created = client.post(
             "/api/experiments",
             json={
