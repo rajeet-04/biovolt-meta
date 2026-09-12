@@ -3,14 +3,19 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from biovolt_backend.api.commands import router as commands_router
 from biovolt_backend.api.experiments import router as experiments_router
 from biovolt_backend.api.health import router as health_router
 from biovolt_backend.api.status import router as status_router
 from biovolt_backend.api.telemetry import router as telemetry_router
+from biovolt_backend.commands.dispatcher import CommandDispatcher
+from biovolt_backend.commands.repository import CommandRepository
+from biovolt_backend.commands.service import CommandService
 from biovolt_backend.config import Settings
 from biovolt_backend.domain.continuity import TelemetryContinuityTracker
 from biovolt_backend.domain.energy import EnergyAccumulator
 from biovolt_backend.domain.processing import ProcessingConfig
+from biovolt_backend.experiments.orchestrator import ExperimentOrchestrator
 from biovolt_backend.experiments.repository import ExperimentRepository
 from biovolt_backend.experiments.service import ExperimentService
 from biovolt_backend.persistence.database import create_engine_and_session, init_database
@@ -36,6 +41,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.telemetry_repository = TelemetryRepository(session_factory)
         app.state.experiment_service = ExperimentService(ExperimentRepository(session_factory))
         app.state.device_registry = DeviceRegistry()
+        app.state.command_service = CommandService(CommandRepository(session_factory))
+        app.state.command_dispatcher = CommandDispatcher(
+            CommandRepository(session_factory),
+            app.state.command_service,
+            app.state.device_registry,
+        )
+        app.state.experiment_orchestrator = ExperimentOrchestrator(
+            app.state.experiment_service,
+            app.state.command_service,
+            app.state.command_dispatcher,
+        )
+        app.state.command_service.set_ack_handler(app.state.experiment_orchestrator.on_ack)
         app.state.dashboard_hub = DashboardHub()
         app.state.telemetry_service = TelemetryService(
             config=ProcessingConfig(
@@ -61,6 +78,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = resolved
     app.include_router(health_router)
     app.include_router(experiments_router)
+    app.include_router(commands_router)
     app.include_router(status_router)
     app.include_router(telemetry_router)
     app.include_router(websocket_router)

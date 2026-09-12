@@ -10,6 +10,10 @@ def service(request: Request) -> ExperimentService:
     return request.app.state.experiment_service
 
 
+def orchestrator(request: Request):
+    return request.app.state.experiment_orchestrator
+
+
 @router.post("")
 async def create(request: Request, body: ExperimentCreate):
     return await service(request).create(body)
@@ -37,12 +41,12 @@ async def ready(request: Request, experiment_id: str):
 
 @router.post("/{experiment_id}/start")
 async def start(request: Request, experiment_id: str):
-    return await service(request).begin_start(experiment_id)
+    return await orchestrator(request).start(experiment_id)
 
 
 @router.post("/{experiment_id}/stop")
 async def stop(request: Request, experiment_id: str):
-    return await service(request).begin_stop(experiment_id)
+    return await orchestrator(request).stop(experiment_id)
 
 
 @router.post("/{experiment_id}/abort")
