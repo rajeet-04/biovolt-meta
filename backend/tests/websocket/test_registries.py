@@ -1,4 +1,3 @@
-import asyncio
 from datetime import UTC, datetime
 
 from biovolt_backend.websocket.dashboard_hub import DashboardHub
@@ -10,7 +9,7 @@ class FakeWebSocket:
         self.fails = fails
         self.payloads: list[dict[str, object]] = []
 
-    def send_json(self, payload: dict[str, object]) -> None:
+    async def send_json(self, payload: dict[str, object]) -> None:
         if self.fails:
             raise RuntimeError("socket closed")
         self.payloads.append(payload)
@@ -40,7 +39,7 @@ def test_device_registry_tracks_latest_telemetry_timestamp() -> None:
     assert registry.latest_telemetry_at("missing") is None
 
 
-def test_dashboard_broadcast_removes_failed_socket_and_reaches_healthy_socket() -> None:
+async def test_dashboard_broadcast_removes_failed_socket_and_reaches_healthy_socket() -> None:
     hub = DashboardHub()
     failed = FakeWebSocket(fails=True)
     healthy = FakeWebSocket()
@@ -48,34 +47,20 @@ def test_dashboard_broadcast_removes_failed_socket_and_reaches_healthy_socket() 
     hub.connect(healthy)
 
     payload = {"sequence": 3}
-    hub.broadcast_json(payload)
+    await hub.broadcast_json(payload)
 
     assert healthy.payloads == [payload]
-    hub.broadcast_json({"sequence": 4})
+    await hub.broadcast_json({"sequence": 4})
     assert healthy.payloads == [payload, {"sequence": 4}]
-
-
-class AsyncFakeWebSocket:
-    def __init__(self, *, fails: bool = False) -> None:
-        self.fails = fails
-        self.payloads: list[dict[str, object]] = []
-
-    async def send_json(self, payload: dict[str, object]) -> None:
-        await asyncio.sleep(0)
-        if self.fails:
-            raise RuntimeError("socket closed")
-        self.payloads.append(payload)
 
 
 async def test_dashboard_broadcast_isolates_async_send_failures() -> None:
     hub = DashboardHub()
-    failed = AsyncFakeWebSocket(fails=True)
-    healthy = AsyncFakeWebSocket()
+    failed = FakeWebSocket(fails=True)
+    healthy = FakeWebSocket()
     hub.connect(failed)
     hub.connect(healthy)
 
-    hub.broadcast_json({"sequence": 8})
-    await asyncio.sleep(0)
-    await asyncio.sleep(0)
+    await hub.broadcast_json({"sequence": 8})
 
     assert healthy.payloads == [{"sequence": 8}]
