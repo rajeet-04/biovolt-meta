@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -96,3 +97,24 @@ def test_processed_model_rejects_naive_timestamp():
 
     with pytest.raises(ValidationError):
         ProcessedTelemetryV1.model_validate(payload)
+
+
+def test_processed_model_rejects_numeric_timestamp():
+    repo = Path(__file__).resolve().parents[3]
+    payload = json.loads((repo / "shared/examples/processed-telemetry.example.json").read_text())
+    payload["timestamp"] = 1787506215
+
+    with pytest.raises(ValidationError):
+        ProcessedTelemetryV1.model_validate(payload)
+
+
+def test_processed_model_accepts_aware_datetime_and_serializes_to_schema():
+    repo = Path(__file__).resolve().parents[3]
+    payload = json.loads((repo / "shared/examples/processed-telemetry.example.json").read_text())
+    payload["timestamp"] = datetime(2026, 8, 23, 17, 30, 15, 124000, tzinfo=UTC)
+
+    model = ProcessedTelemetryV1.model_validate(payload)
+    serialized = model.model_dump(mode="json")
+
+    assert serialized["timestamp"] == "2026-08-23T17:30:15.124000Z"
+    validate_payload("processed-telemetry.v1.schema.json", serialized)

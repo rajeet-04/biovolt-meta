@@ -1,6 +1,18 @@
-from typing import Literal
+from datetime import datetime
+from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, BeforeValidator, ConfigDict, Field
+
+
+def _validate_timestamp_input(value: object) -> object:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, datetime) and value.tzinfo is not None and value.utcoffset() is not None:
+        return value
+    raise ValueError("timestamp must be an ISO string or timezone-aware datetime")
+
+
+ProcessedTimestamp = Annotated[AwareDatetime, BeforeValidator(_validate_timestamp_input)]
 
 
 class ElectricalRaw(BaseModel):
@@ -111,7 +123,7 @@ class ProcessedTelemetryV1(BaseModel):
     device_id: str = Field(min_length=1, max_length=64)
     cell_id: str = Field(min_length=1, max_length=64)
     sequence: int = Field(ge=0)
-    timestamp: AwareDatetime = Field(strict=False)
+    timestamp: ProcessedTimestamp = Field(strict=False)
     electrical: ElectricalProcessed
     biological: BiologicalProcessed
     environment: EnvironmentProcessed
