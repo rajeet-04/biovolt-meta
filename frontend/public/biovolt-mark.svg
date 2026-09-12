@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">BioVolt</title>
+  <desc id="desc">A green leaf with a lightning-shaped vein on a dark background.</desc>
+  <rect width="512" height="512" rx="112" fill="#0c100e"/>
+  <path d="M112 302c8-112 91-184 246-200-8 135-68 231-190 267-32 9-58-25-56-67Z" fill="#4ade80"/>
+  <path d="M129 374c71-83 145-140 229-188" fill="none" stroke="#d8ffe3" stroke-linecap="round" stroke-width="18"/>
+  <path d="m284 159-43 105h47l-35 89 95-127h-52l43-67Z" fill="#0c100e"/>
+</svg>
