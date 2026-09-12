@@ -29,6 +29,7 @@ async def init_database(engine: AsyncEngine) -> None:
 
     # Register ORM tables before creating metadata. The local import avoids a
     # module cycle because models inherit from Base defined in this module.
+    from biovolt_backend.calibration import models as calibration_models  # noqa: F401
     from biovolt_backend.commands import models as command_models  # noqa: F401
     from biovolt_backend.experiments import models as experiment_models  # noqa: F401
     from biovolt_backend.persistence import models  # noqa: F401
