@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "device_id": "biovolt-01",
+  "cell_id": "cell-a",
+  "sequence": 1245,
+  "timestamp": "2026-08-23T17:30:15.124+05:30",
+  "electrical": {
+    "voltage_mv": 438.2,
+    "current_ua": 4.382,
+    "power_uw": 1.920,
+    "load_resistance_ohm": 100000,
+    "cumulative_energy_mj": 8.431
+  },
+  "biological": {
+    "od680": 0.823,
+    "biomass_g_l": 0.424,
+    "biomass_total_g": 0.106,
+    "biomass_delta_g": 0.022,
+    "co2_biofixed_g": 0.0403
+  },
+  "environment": {
+    "temperature_c": 26.4,
+    "lux": 910.0
+  },
+  "actuators": {
+    "grow_led_pwm": 130,
+    "mixer_on": false
+  },
+  "control": {
+    "mode": "adaptive"
+  }
+}

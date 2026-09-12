@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://biovolt.local/schemas/processed-telemetry.v1.schema.json",
+  "title": "BioVolt Processed Telemetry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "device_id",
+    "cell_id",
+    "sequence",
+    "timestamp",
+    "electrical",
+    "biological",
+    "environment",
+    "actuators",
+    "control"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "device_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "cell_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "sequence": {"type": "integer", "minimum": 0},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "electrical": {"$ref": "#/$defs/electrical"},
+    "biological": {"$ref": "#/$defs/biological"},
+    "environment": {"$ref": "#/$defs/environment"},
+    "actuators": {"$ref": "#/$defs/actuators"},
+    "control": {"$ref": "#/$defs/control"}
+  },
+  "$defs": {
+    "electrical": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "voltage_mv",
+        "current_ua",
+        "power_uw",
+        "load_resistance_ohm",
+        "cumulative_energy_mj"
+      ],
+      "properties": {
+        "voltage_mv": {"type": ["number", "null"]},
+        "current_ua": {"type": ["number", "null"]},
+        "power_uw": {"type": ["number", "null"]},
+        "load_resistance_ohm": {"type": "number", "exclusiveMinimum": 0},
+        "cumulative_energy_mj": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "biological": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "od680",
+        "biomass_g_l",
+        "biomass_total_g",
+        "biomass_delta_g",
+        "co2_biofixed_g"
+      ],
+      "properties": {
+        "od680": {"type": ["number", "null"], "minimum": 0},
+        "biomass_g_l": {"type": ["number", "null"], "minimum": 0},
+        "biomass_total_g": {"type": ["number", "null"], "minimum": 0},
+        "biomass_delta_g": {"type": ["number", "null"]},
+        "co2_biofixed_g": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["temperature_c", "lux"],
+      "properties": {
+        "temperature_c": {"type": ["number", "null"]},
+        "lux": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "actuators": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["grow_led_pwm", "mixer_on"],
+      "properties": {
+        "grow_led_pwm": {"type": "integer", "minimum": 0, "maximum": 255},
+        "mixer_on": {"type": "boolean"}
+      }
+    },
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["monitor", "passive", "adaptive", "manual"]
+        }
+      }
+    }
+  }
+}
