@@ -14,9 +14,7 @@ async def test_health_endpoint():
             device_shared_token="test-token-123",
         )
     )
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/api/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
