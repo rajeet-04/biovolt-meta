@@ -41,6 +41,10 @@ htmlcov/
 .worktrees/
 worktrees/
 
+# Local ESP32 firmware secrets (real file lives outside the repo;
+# BuildSecrets.example.h is the committed template).
+firmware/esp32/include/BuildSecrets.h
+
 # Python build artifacts
 *.egg-info/
 build/
