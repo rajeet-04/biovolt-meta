@@ -1,5 +1,5 @@
 import json
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
@@ -9,7 +9,7 @@ def repository_root() -> Path:
     return Path(__file__).resolve().parents[4]
 
 
-@lru_cache(maxsize=None)
+@cache
 def load_schema(filename: str) -> dict[str, object]:
     path = repository_root() / "shared" / "schemas" / filename
     return json.loads(path.read_text(encoding="utf-8"))
