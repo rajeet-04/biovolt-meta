@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,3 +16,11 @@ class Settings(BaseSettings):
     load_resistance_ohm: float = Field(default=100_000.0, gt=0)
     bpw34_dark_raw: float | None = None
     bpw34_blank_raw: float | None = None
+
+    @field_validator("bpw34_dark_raw", "bpw34_blank_raw", mode="before")
+    @classmethod
+    def blank_calibration_is_unset(cls, value: object) -> object:
+        """Treat an explicitly blank optional calibration as an omitted value."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value

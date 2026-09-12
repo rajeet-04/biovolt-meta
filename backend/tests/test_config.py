@@ -20,3 +20,14 @@ def test_settings_load_biovol_environment(monkeypatch):
 
     assert settings.environment == "staging"
     assert settings.device_shared_token == "environment-token-123"
+
+
+def test_settings_treat_blank_optional_calibration_as_unset(monkeypatch):
+    monkeypatch.setenv("BIOVOLT_DEVICE_SHARED_TOKEN", "environment-token-123")
+    monkeypatch.setenv("BIOVOLT_BPW34_DARK_RAW", "")
+    monkeypatch.setenv("BIOVOLT_BPW34_BLANK_RAW", "   ")
+
+    settings = Settings()
+
+    assert settings.bpw34_dark_raw is None
+    assert settings.bpw34_blank_raw is None

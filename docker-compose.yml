@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+    env_file:
+      - .env
     ports:
       - "8000:8000"
     environment:
@@ -10,10 +12,6 @@ services:
       - BIOVOLT_DATABASE_URL=sqlite+aiosqlite:////data/biovolt.db
       - BIOVOLT_DEVICE_SHARED_TOKEN=${BIOVOLT_DEVICE_SHARED_TOKEN:?BIOVOLT_DEVICE_SHARED_TOKEN must be set in .env or the shell}
       - BIOVOLT_LOAD_RESISTANCE_OHM=${BIOVOLT_LOAD_RESISTANCE_OHM:-100000}
-      # Bare entries are passed only when defined. This keeps unset optional
-      # calibration values out of Pydantic Settings instead of passing blanks.
-      - BIOVOLT_BPW34_DARK_RAW
-      - BIOVOLT_BPW34_BLANK_RAW
     volumes:
       - biovolt-data:/data
     healthcheck:
