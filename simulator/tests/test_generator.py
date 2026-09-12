@@ -1,3 +1,5 @@
+import pytest
+
 from biovolt_simulator.generator import TelemetryGenerator, validate_telemetry_frame
 
 
@@ -19,6 +21,19 @@ def test_sequence_and_uptime_follow_elapsed_time() -> None:
     assert second["sequence"] == 2
     assert first["uptime_ms"] == 0
     assert second["uptime_ms"] == 500
+
+
+def test_elapsed_time_regression_is_rejected_without_mutating_state() -> None:
+    generator = TelemetryGenerator(seed=42, device_id="d1", cell_id="c1")
+
+    generator.next_frame(1.0)
+    state_before = generator.state
+
+    with pytest.raises(ValueError, match="must not regress"):
+        generator.next_frame(0.5)
+
+    assert generator.state == state_before
+    assert generator.next_frame(1.5)["sequence"] == state_before.sequence + 1
 
 
 def test_growth_reduces_transmitted_light_without_noise() -> None:

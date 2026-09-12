@@ -107,6 +107,8 @@ class TelemetryGenerator:
 
         sequence = self._next_sequence
         uptime_ms = int(round(elapsed_seconds * 1000))
+        if uptime_ms < self._state.uptime_ms:
+            raise ValueError("elapsed_seconds must not regress simulator uptime")
         od_target = self.start_od + self.growth_rate_per_second * elapsed_seconds
 
         dark_raw = 320.0
