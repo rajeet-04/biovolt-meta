@@ -1,9 +1,11 @@
+import { RouterProvider } from 'react-router-dom'
+import { appRouter } from './router'
 import { AppSurface } from '../components/layout/AppSurface'
 
 export function App() {
   return (
     <AppSurface>
-      <h1>BioVolt</h1>
+      <RouterProvider router={appRouter} />
     </AppSurface>
   )
 }
