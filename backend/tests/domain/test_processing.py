@@ -92,6 +92,28 @@ def test_build_processed_telemetry_keeps_unavailable_derived_values_null() -> No
     assert result.control.mode == raw.control.mode
 
 
+def test_build_processed_telemetry_rejects_negative_od680_as_null() -> None:
+    raw = canonical_raw()
+    raw.optical.bpw34_raw = 30_000
+
+    result = build_processed_telemetry(
+        raw,
+        timestamp=datetime(2026, 8, 23, 12, 0, tzinfo=UTC),
+        config=ProcessingConfig(
+            load_resistance_ohm=100_000.0,
+            bpw34_dark_raw=320,
+            bpw34_blank_raw=23_840,
+        ),
+        cumulative_energy_mj=0.0,
+    )
+
+    assert result.biological.od680 is None
+    validate_payload(
+        "processed-telemetry.v1.schema.json",
+        result.model_dump(mode="json"),
+    )
+
+
 def test_build_processed_telemetry_rejects_naive_timestamp() -> None:
     with pytest.raises(ValidationError):
         build_processed_telemetry(

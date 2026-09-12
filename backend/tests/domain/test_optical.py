@@ -19,6 +19,7 @@ def test_od680_uses_dark_and_blank_correction():
         (12080, 320, None),
         (320, 320, 23840),
         (12080, 320, 320),
+        (30000, 320, 23840),
     ],
 )
 def test_invalid_optical_reference_returns_none(sample, dark, blank):

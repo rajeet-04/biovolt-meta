@@ -13,6 +13,6 @@ def calculate_od680(
         return None
     numerator = sample_raw - dark_raw
     denominator = blank_raw - dark_raw
-    if numerator <= 0 or denominator <= 0:
+    if numerator <= 0 or denominator <= 0 or numerator > denominator:
         return None
     return -math.log10(numerator / denominator)
