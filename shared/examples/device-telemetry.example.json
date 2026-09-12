@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "device_id": "biovolt-01",
+  "sequence": 1245,
+  "uptime_ms": 582340,
+  "cell_id": "cell-a",
+  "electrical": {
+    "bpv_voltage_mv": 438.2,
+    "bpv_adc_raw": 18431
+  },
+  "optical": {
+    "bpw34_raw": 17320,
+    "bpw34_voltage_mv": 1321.4,
+    "led_680_enabled": true
+  },
+  "environment": {
+    "temperature_c": 26.4,
+    "lux": 910.0
+  },
+  "actuators": {
+    "grow_led_pwm": 130,
+    "mixer_on": false
+  },
+  "control": {
+    "mode": "adaptive",
+    "optimizer_direction": 1
+  },
+  "health": {
+    "ads1115_ok": true,
+    "bpw34_ok": true,
+    "temperature_ok": true,
+    "light_sensor_ok": true
+  }
+}
