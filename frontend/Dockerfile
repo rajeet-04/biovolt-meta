@@ -8,4 +8,5 @@ FROM nginx:1.29-alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY deploy/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY deploy/nginx/conf.d/operator.conf /etc/nginx/conf.d/default.conf
+COPY deploy/nginx/conf.d/public-read-only.conf /etc/nginx/conf.d/public-read-only.conf
 EXPOSE 80

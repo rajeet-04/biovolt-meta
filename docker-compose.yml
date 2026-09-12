@@ -35,6 +35,7 @@ services:
         condition: service_healthy
     ports:
       - "80:80"
+      - "8081:8081"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://localhost/healthz"]
@@ -59,19 +60,16 @@ services:
       - BIOVOLT_SIM_INTERVAL_SECONDS=0.5
       - BIOVOLT_SIM_SEED=42
 
-  frontend:
+  cloudflared:
     profiles:
-      - frontend
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-    depends_on:
-      backend:
-        condition: service_healthy
+      - public
+    image: cloudflare/cloudflared:2025.8.1
+    command: tunnel --no-autoupdate run
     environment:
-      - BIOVOLT_PROXY_TARGET=http://backend:8000
-    ports:
-      - "4173:4173"
+      - TUNNEL_TOKEN=${BIOVOLT_CLOUDFLARED_TUNNEL_TOKEN:?set token only for public profile}
+    depends_on:
+      nginx:
+        condition: service_healthy
 
 volumes:
   biovolt-data:
