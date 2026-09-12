@@ -21,7 +21,41 @@ BioVolt is an adaptive living biophotovoltaic research prototype for MetaMorph 2
 
 ## Current Development Phase
 
-Phase 0: repository foundation and versioned protocol contracts.
+Phase 1: backend, simulator, persistence, and integration development.
+
+## Docker Compose Development Stack
+
+The root Compose file runs the backend by default. It stores SQLite data in
+the named `biovolt-data` volume and reads the device token from
+`BIOVOLT_DEVICE_SHARED_TOKEN`; no token is committed to the repository.
+
+Prepare local configuration once:
+
+```bash
+cp .env.example .env
+# Replace BIOVOLT_DEVICE_SHARED_TOKEN in .env with a long random token.
+```
+
+Start only the backend and check its health endpoint:
+
+```bash
+docker compose up --build -d backend
+curl http://localhost:8000/api/health
+```
+
+The simulator is opt-in through the `simulator` profile. Start both services
+and inspect the connected-device status with:
+
+```bash
+docker compose --profile simulator up --build -d
+curl http://localhost:8000/api/system/status
+```
+
+The optional `BIOVOLT_BPW34_DARK_RAW` and `BIOVOLT_BPW34_BLANK_RAW` settings
+should remain commented out when unused. Compose passes those values only when
+they are defined, avoiding blank strings that strict Pydantic float settings
+cannot parse. Stop and restart services without `docker compose down -v` to
+keep persisted telemetry; `down -v` intentionally removes the named volume.
 
 ## Scientific Ownership Rule
 
