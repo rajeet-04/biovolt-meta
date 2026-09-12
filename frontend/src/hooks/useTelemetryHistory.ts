@@ -62,10 +62,10 @@ export function useTelemetryHistory(
           { deviceId, cellId, limit: clampLimit(limit) },
           controller.signal,
         )
-        if (active) setState({ data, loading: false, error: null, sourceKey: `${deviceId}::${cellId}` })
+        if (active) setState({ data, loading: false, error: null, sourceKey: `${encodeURIComponent(deviceId)}::${encodeURIComponent(cellId)}` })
       } catch (error) {
         if (active && !isAbortError(error)) {
-          setState({ data: [], loading: false, error: errorMessage(error), sourceKey: `${deviceId}::${cellId}` })
+          setState({ data: [], loading: false, error: errorMessage(error), sourceKey: `${encodeURIComponent(deviceId)}::${encodeURIComponent(cellId)}` })
         }
       }
     }
@@ -77,7 +77,7 @@ export function useTelemetryHistory(
     }
   }, [cellId, deviceId, limit, reloadVersion])
 
-  const requestedSourceKey = deviceId === null || cellId === null ? null : `${deviceId}::${cellId}`
+  const requestedSourceKey = deviceId === null || cellId === null ? null : `${encodeURIComponent(deviceId)}::${encodeURIComponent(cellId)}`
   const visibleState = requestedSourceKey === null || state.sourceKey !== requestedSourceKey
     ? { data: [], loading: requestedSourceKey !== null, error: null }
     : state

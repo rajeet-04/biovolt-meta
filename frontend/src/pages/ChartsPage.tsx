@@ -3,6 +3,7 @@ import { ChartModeSelector, type ChartMode } from '../components/charts/ChartMod
 import { chartMetadata } from '../components/charts/chartMetadata'
 import { TelemetryChart } from '../components/charts/TelemetryChart'
 import { metricSeries, type TelemetryMetric } from '../components/charts/series'
+import { selectTimeWindow } from '../components/charts/selectWindow'
 import { SourceSelector } from '../components/status/SourceSelector'
 import { useTelemetryHistory } from '../hooks/useTelemetryHistory'
 import { useTelemetryStore, type TelemetrySourceState } from '../stores/telemetryStore'
@@ -40,20 +41,6 @@ function selectedSource(
   return Object.values(sources)[0] ?? null
 }
 
-function selectLiveWindow(frames: ProcessedTelemetryV1[], windowMs: number): ProcessedTelemetryV1[] {
-  const latest = frames.at(-1)
-  if (!latest) return []
-
-  const latestTimestampMs = Date.parse(latest.timestamp)
-  if (!Number.isFinite(latestTimestampMs)) return frames
-
-  const lowerBound = latestTimestampMs - windowMs
-  return frames.filter((frame) => {
-    const timestampMs = Date.parse(frame.timestamp)
-    return Number.isFinite(timestampMs) && timestampMs >= lowerBound
-  })
-}
-
 function pointsForMetric(frames: ProcessedTelemetryV1[], metric: TelemetryMetric) {
   const points = metricSeries(frames, metric)
   return points.some((point) => point.value !== null) ? points : []
@@ -72,7 +59,7 @@ export function ChartsPage() {
     mode === 'history'
       ? history.data
       : source
-        ? selectLiveWindow(source.liveBuffer, liveWindows[mode])
+        ? selectTimeWindow(source.liveBuffer, liveWindows[mode])
         : []
 
   return (
