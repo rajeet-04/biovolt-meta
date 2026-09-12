@@ -1,3 +1,4 @@
+import copy
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -7,6 +8,7 @@ import pytest
 import biovolt_backend.services.telemetry_service as telemetry_service_module
 from biovolt_backend.contracts.loader import validate_payload as real_validate_payload
 from biovolt_backend.contracts.models import DeviceTelemetryV1, ProcessedTelemetryV1
+from biovolt_backend.domain.electrical import power_uw
 from biovolt_backend.domain.energy import EnergyAccumulator
 from biovolt_backend.domain.processing import ProcessingConfig
 from biovolt_backend.services.telemetry_service import TelemetryRejected, TelemetryService
@@ -111,6 +113,36 @@ def service_with_fakes(
     return service, energy, throttle, repository, hub, registry
 
 
+def service_with_real_energy(
+    events: list[str],
+) -> tuple[
+    TelemetryService,
+    EnergyAccumulator,
+    FakeThrottle,
+    FakeRepository,
+    FakeHub,
+    FakeRegistry,
+]:
+    energy = EnergyAccumulator()
+    throttle = FakeThrottle(events)
+    repository = FakeRepository(events)
+    hub = FakeHub(events)
+    registry = FakeRegistry(events)
+    service = TelemetryService(
+        config=ProcessingConfig(
+            load_resistance_ohm=100_000.0,
+            bpw34_dark_raw=320,
+            bpw34_blank_raw=23_840,
+        ),
+        energy=energy,
+        throttle=throttle,
+        repository=repository,
+        dashboard_hub=hub,
+        device_registry=registry,
+    )
+    return service, energy, throttle, repository, hub, registry
+
+
 async def test_handle_raw_validates_processes_persists_and_broadcasts(monkeypatch) -> None:
     events: list[str] = []
     service, energy, throttle, repository, hub, registry = service_with_fakes(events)
@@ -143,6 +175,57 @@ async def test_handle_raw_validates_processes_persists_and_broadcasts(monkeypatc
     assert repository.calls[0][2] is payload
     assert hub.payloads == [processed.model_dump(mode="json")]
     assert events == ["schema", "energy", "registry", "throttle", "repository", "dashboard"]
+
+
+async def test_handle_raw_uses_device_uptime_when_server_receive_is_delayed() -> None:
+    events: list[str] = []
+    service, _, throttle, repository, hub, registry = service_with_real_energy(events)
+    first = canonical_payload()
+    first["sequence"] = 100
+    first["uptime_ms"] = 1000
+    second = copy.deepcopy(first)
+    second["sequence"] = 101
+    second["uptime_ms"] = 1575
+    first_received_at = datetime(2026, 8, 23, 12, 0, tzinfo=UTC)
+    second_received_at = datetime(2026, 8, 23, 12, 0, 42, tzinfo=UTC)
+
+    await service.handle_raw(first, "biovolt-01", first_received_at)
+    processed = await service.handle_raw(second, "biovolt-01", second_received_at)
+
+    measured_power_uw = power_uw(438.2, 100_000.0)
+    assert processed.timestamp == second_received_at
+    assert processed.electrical.cumulative_energy_mj == pytest.approx(
+        measured_power_uw * 0.575 / 1000.0
+    )
+    assert [payload["sequence"] for payload in hub.payloads] == [100, 101]
+    assert [raw.sequence for raw, _, _ in repository.calls] == [100, 101]
+    assert throttle.calls[-1][-1] == second_received_at
+    assert registry.calls[-1][-1] == second_received_at
+
+
+async def test_handle_raw_accepts_sequence_gap_without_fabricating_sample() -> None:
+    events: list[str] = []
+    service, _, _, repository, hub, _ = service_with_real_energy(events)
+    first = canonical_payload()
+    first["sequence"] = 100
+    first["uptime_ms"] = 1000
+    second = copy.deepcopy(first)
+    second["sequence"] = 102
+    second["uptime_ms"] = 1575
+    second["electrical"]["bpv_voltage_mv"] = 876.4  # type: ignore[index]
+    received_at = datetime(2026, 8, 23, 12, 0, tzinfo=UTC)
+
+    await service.handle_raw(first, "biovolt-01", received_at)
+    processed = await service.handle_raw(second, "biovolt-01", received_at)
+
+    assert processed.sequence == 102
+    first_power_uw = power_uw(438.2, 100_000.0)
+    second_power_uw = power_uw(876.4, 100_000.0)
+    assert processed.electrical.cumulative_energy_mj == pytest.approx(
+        (first_power_uw + second_power_uw) / 2.0 * 0.575 / 1000.0
+    )
+    assert [payload["sequence"] for payload in hub.payloads] == [100, 102]
+    assert [raw.sequence for raw, _, _ in repository.calls] == [100, 102]
 
 
 async def test_handle_raw_rejects_mismatched_authenticated_device_before_fanout() -> None:

@@ -12,6 +12,14 @@ def test_energy_uses_trapezoidal_integration() -> None:
     assert value == pytest.approx(0.015)
 
 
+def test_energy_uses_each_device_uptime_interval() -> None:
+    acc = EnergyAccumulator()
+
+    assert acc.update("d1", "c1", 1000, 10.0) == 0.0
+    assert acc.update("d1", "c1", 1575, 20.0) == pytest.approx(0.008625)
+    assert acc.update("d1", "c1", 2110, 30.0) == pytest.approx(0.022)
+
+
 def test_uptime_decrease_resets_boot_session_energy() -> None:
     acc = EnergyAccumulator()
     acc.update("d1", "c1", 1000, 10.0)
