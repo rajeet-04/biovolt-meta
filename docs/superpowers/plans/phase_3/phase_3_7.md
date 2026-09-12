@@ -4,7 +4,7 @@
 
 **Goal:** Prove the simulator can be switched off and the real ESP32 can take its place without backend/frontend rewrites, while preventing cumulative-energy inflation across dropped telemetry intervals.
 
-**Architecture:** Hardware parity is verified through the exact same `/ws/device -> FastAPI -> SQLite -> /ws/dashboard -> PWA` path already tested by the simulator. A source-neutral backend continuity tracker treats a telemetry sequence gap as an observation discontinuity: cumulative energy is preserved, but the unobserved interval is not numerically integrated.
+**Architecture:** Hardware parity is verified through the exact same `/ws/device -> FastAPI -> SQLite -> /ws/dashboard -> PWA` path already exercised by the simulator. A source-neutral backend continuity tracker treats a telemetry sequence gap as an observation discontinuity: accumulated energy is preserved, but the unobserved interval is not numerically integrated.
 
 **Tech Stack:** Existing FastAPI backend, pytest, ESP32 firmware, Phase 2 PWA, Docker Compose.
 
@@ -12,18 +12,18 @@
 
 ## Global Constraints
 
-- Do not create hardware-only API endpoints.
-- Do not add `is_hardware`, `is_simulated`, `source_type`, or equivalent fields.
-- Real ESP32 and simulator continue using the same raw schema and auth route.
-- A missing telemetry interval is unknown data. Do not interpolate energy across it as if measurements existed.
+- Do not create hardware-only API endpoints or hardware/source discriminator fields.
+- Real ESP32 and simulator use the same raw schema and authentication path.
+- Missing telemetry is unknown data. Do not interpolate or integrate across an unobserved interval.
 - Cumulative energy before a sequence gap is preserved.
-- First frame after a sequence gap establishes a new integration anchor and adds zero energy for the missing interval.
+- First frame after a gap establishes a new energy anchor and contributes zero energy for the missing interval.
 - A true device reboot, detected by decreasing uptime, still resets boot-session energy to zero according to Phase 1 semantics.
-- Sequence wraparound is not required in Phase 3 because `uint32_t` at 2 Hz has multi-decade lifetime; document this explicitly.
+- Processed telemetry v1 contains `control.mode` but does **not** contain `optimizer_direction`. `optimizer_direction=0` is verified in raw device telemetry, not invented by the PWA.
+- `uint32_t` sequence wraparound handling is outside Phase 3 because at 2 Hz wraparound is decades away; document the assumption explicitly.
 
 ---
 
-### Task 1: Add source-neutral telemetry continuity tracker to backend
+### Task 1: Add source-neutral telemetry continuity tracker
 
 **Files:**
 - Create: `backend/src/biovolt_backend/domain/continuity.py`
@@ -59,19 +59,19 @@ Rules:
 first frame                        contiguous=False, restarted=False
 sequence previous+1, uptime up     contiguous=True,  restarted=False
 sequence gap, uptime up            contiguous=False, restarted=False
-same/older sequence, uptime up     contiguous=False, restarted=False
+duplicate/older sequence           contiguous=False, restarted=False
 uptime decreases                   contiguous=False, restarted=True
 ```
 
-- [ ] **Step 1: Write failing continuity tests**
+- [ ] **Step 1: Write failing tests**
 
-Cover exact contiguous frames `100 -> 101`, gap `100 -> 103`, duplicate `100 -> 100`, and reboot `uptime 5000 -> 100`.
+Cover contiguous `100 -> 101`, gap `100 -> 103`, duplicate `100 -> 100`, older `100 -> 99`, and reboot `uptime 5000 -> 100`.
 
 - [ ] **Step 2: Implement tracker keyed by `(device_id, cell_id)`**
 
-Store only last sequence/uptime for each source.
+Keep only last accepted sequence/uptime per source. Source identity is generic and contains no simulator/hardware branch.
 
-- [ ] **Step 3: Run tests and commit**
+- [ ] **Step 3: Run and commit**
 
 ```bash
 cd backend
@@ -90,8 +90,6 @@ git commit -m "feat: track BioVolt telemetry continuity"
 
 **Interfaces:**
 
-Add:
-
 ```python
 EnergyAccumulator.anchor(
     device_id: str,
@@ -103,12 +101,10 @@ EnergyAccumulator.anchor(
 
 Behavior:
 - preserve current cumulative mJ,
-- replace stored last uptime/power with the supplied frame,
+- replace last uptime/power anchor with supplied frame,
 - add no energy for the interval leading to the supplied frame.
 
 - [ ] **Step 1: Write failing gap-anchor test**
-
-Example:
 
 ```python
 acc = EnergyAccumulator()
@@ -120,15 +116,13 @@ assert acc.update("d1", "c1", 11000, 20.0) == pytest.approx(0.030)
 
 The 9-second unobserved interval contributes zero.
 
-- [ ] **Step 2: Preserve reboot behavior**
+- [ ] **Step 2: Preserve reboot test**
 
-Existing uptime-decrease test remains reset-to-zero.
+Existing uptime-decrease behavior remains reset-to-zero.
 
-- [ ] **Step 3: Implement `anchor()`**
+- [ ] **Step 3: Implement anchor without duplicating integration formula**
 
-Do not duplicate integration formulas.
-
-- [ ] **Step 4: Run tests and commit**
+- [ ] **Step 4: Run and commit**
 
 ```bash
 pytest tests/domain/test_energy.py -v
@@ -146,40 +140,42 @@ git commit -m "feat: prevent energy integration across telemetry gaps"
 - Modify: `backend/tests/services/test_telemetry_service.py`
 
 **Interfaces:**
-- `TelemetryService` constructor receives `TelemetryContinuityTracker`.
+- `TelemetryService` constructor receives one `TelemetryContinuityTracker`.
 
-Processing order becomes:
+Processing order:
 
 ```text
 validate raw schema
 parse raw model
-authenticated device ID check
+authenticated device-ID check
 continuity.observe(sequence, uptime)
 if restarted:
-    energy.reset(...)
+    energy.reset(source)
     energy.anchor(current frame)
 elif contiguous:
     energy.update(current frame)
 else:
     energy.anchor(current frame)
 build processed telemetry
-persist when throttle allows
+persist according to throttle
 broadcast
 ```
 
-- [ ] **Step 1: Write failing sequence-gap service test**
+- [ ] **Step 1: Write failing gap service test**
 
-Feed valid sequence `10` at uptime `1000`, sequence `11` at `1500`, then sequence `20` at `10000`. Assert cumulative energy at sequence 20 equals cumulative value at sequence 11, not a large bridged value.
+Feed sequence 10 at uptime 1000, sequence 11 at 1500, then sequence 20 at 10000. Sequence 20 cumulative energy must equal the cumulative total from sequence 11.
 
-- [ ] **Step 2: Write next-contiguous-frame test**
+- [ ] **Step 2: Write resumed-contiguous test**
 
-Sequence `21` at `10500` resumes normal trapezoidal integration from sequence 20.
+Sequence 21 at 10500 integrates only the 500 ms interval from sequence 20 to 21.
 
-- [ ] **Step 3: Wire tracker into application lifespan**
+- [ ] **Step 3: Write reboot service test**
 
-One tracker instance per FastAPI process.
+A lower uptime causes boot-session cumulative energy reset while retaining valid processing of the new frame as anchor.
 
-- [ ] **Step 4: Run service/integration tests and commit**
+- [ ] **Step 4: Wire one tracker in app lifespan**
+
+- [ ] **Step 5: Run and commit**
 
 ```bash
 pytest tests/services tests/integration -v
@@ -189,28 +185,28 @@ git commit -m "fix: treat BioVolt telemetry gaps as energy discontinuities"
 
 ---
 
-### Task 4: Add real ESP32 parity integration checklist
+### Task 4: Add real ESP32 parity checklist
 
 **Files:**
 - Create: `scripts/phase3_hardware_parity.md`
 
-- [ ] **Step 1: Start backend and PWA with simulator disabled**
+- [ ] **Step 1: Start backend/PWA with simulator disabled**
 
 ```bash
 docker compose stop simulator || true
 docker compose --profile frontend up --build -d
 ```
 
-- [ ] **Step 2: Connect laptop hotspot and ESP32**
+- [ ] **Step 2: Provision actual laptop network details and reboot ESP32**
 
-Provision ESP32 with:
+Set:
 
 ```text
-SSID/password of laptop hotspot
-backend_host = laptop hotspot gateway/IP
-backend_port = 8000
-device_id = biovolt-01
-cell_id = cell-a
+laptop hotspot SSID/password
+actual laptop hotspot/backend IP
+backend port 8000
+device_id biovolt-01
+cell_id cell-a
 shared token matching backend
 ```
 
@@ -220,30 +216,43 @@ shared token matching backend
 curl http://localhost:8000/api/system/status
 ```
 
-Expected: `biovolt-01` connected.
+Expected configured real device ID is connected.
 
-- [ ] **Step 4: Verify latest telemetry**
+- [ ] **Step 4: Verify latest processed telemetry**
 
 ```bash
 curl "http://localhost:8000/api/telemetry/latest?device_id=biovolt-01&cell_id=cell-a"
 ```
 
-Verify:
+Verify exactly:
 
 ```text
-real sequence increases
-voltage reflects physical ADC
+processed sequence increases
+voltage reflects physical ADS1115 channel A0
 current/power are backend-derived
-OD680 appears only when backend optical calibration is valid
-control.mode=monitor
-optimizer_direction is not exposed in processed payload unless contract includes it
+OD680 is present only when backend optical references are valid
+control.mode == "monitor"
+processed telemetry contains no optimizer_direction field
 ```
 
-- [ ] **Step 5: Verify PWA without rebuild**
+- [ ] **Step 5: Verify raw Phase 3 optimizer state separately**
 
-Open existing PWA. It must render the real device using the same metric components used for simulator data and must not add a hardware-specific branch.
+Use firmware native serializer test or a safe debug capture of one raw device frame and verify:
 
-- [ ] **Step 6: Commit checklist**
+```json
+"control": {
+  "mode": "monitor",
+  "optimizer_direction": 0
+}
+```
+
+Do not add optimizer_direction to processed telemetry/PWA merely for this check.
+
+- [ ] **Step 6: Verify PWA without rebuild**
+
+Existing PWA metric components must render the real device with no `Hardware`/`Simulator` branch inferred from the device ID.
+
+- [ ] **Step 7: Commit checklist**
 
 ```bash
 git add scripts/phase3_hardware_parity.md
@@ -252,14 +261,14 @@ git commit -m "docs: add real ESP32 parity acceptance checklist"
 
 ---
 
-### Task 5: Verify reconnect gap behavior with physical device
+### Task 5: Verify backend-outage gap behavior with physical device
 
 **Files:**
 - Modify: `scripts/phase3_hardware_parity.md`
 
-- [ ] **Step 1: Record current sequence and cumulative energy**
+- [ ] **Step 1: Record current sequence, uptime, and cumulative energy**
 
-- [ ] **Step 2: Stop backend for 15 seconds while ESP32 stays powered**
+- [ ] **Step 2: Stop backend for 15 seconds while ESP32 remains powered**
 
 ```bash
 docker compose stop backend
@@ -267,37 +276,36 @@ sleep 15
 docker compose start backend
 ```
 
-- [ ] **Step 3: Confirm ESP32 reconnects without reboot**
+- [ ] **Step 3: Confirm reconnect without ESP32 reboot**
 
-Uptime remains increasing. Received sequence jumps because frames were discarded during outage.
+Uptime continues increasing and first received sequence jumps because unsent scheduled frames were discarded.
 
-- [ ] **Step 4: Confirm cumulative energy does not jump across the missing interval**
+- [ ] **Step 4: Confirm first post-gap energy does not jump**
 
-First post-reconnect frame preserves the pre-gap accumulated total. Following contiguous frame resumes integration.
+First post-reconnect processed frame preserves pre-gap cumulative total. The next contiguous frame resumes normal integration.
 
-- [ ] **Step 5: Verify PWA reconnect/resync behavior**
+- [ ] **Step 5: Verify PWA reconnect/resync**
 
-PWA transitions through stale/disconnected and returns to live without a source-specific refresh.
+PWA moves through stale/disconnected and returns to live without a source-specific reload.
 
-- [ ] **Step 6: Commit documented result format**
-
-Record in PR notes:
+- [ ] **Step 6: Record evidence**
 
 ```text
 pre-gap sequence
 post-gap sequence
+ESP32 uptime before/after
 pre-gap cumulative mJ
 first post-gap cumulative mJ
 second post-gap cumulative mJ
-ESP32 uptime before/after
 ```
 
 ## Module 3.7 Exit Criteria
 
-- [ ] Backend remains source-neutral.
-- [ ] Sequence gaps are detected independently of simulator/hardware identity.
-- [ ] Energy is not integrated across unobserved telemetry intervals.
+- [ ] Continuity logic is source-neutral.
+- [ ] Sequence gaps/duplicates are treated as observation discontinuities.
+- [ ] Energy is never integrated across an unobserved gap.
 - [ ] Device reboot still resets boot-session energy.
 - [ ] Real ESP32 replaces simulator without backend route/schema changes.
-- [ ] Existing PWA renders real device without rebuild or simulator-specific logic.
+- [ ] Processed telemetry remains contract-exact and does not gain optimizer_direction.
+- [ ] PWA renders real device without rebuild or simulator/hardware-specific logic.
 - [ ] Backend restart/outage does not require ESP32 reboot.
