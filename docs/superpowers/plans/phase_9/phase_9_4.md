@@ -16,6 +16,7 @@
 - Negative measured gain is a valid result and must not be hidden.
 - Synthetic/demo data cannot satisfy a measured-performance release claim.
 - The final demo must remain executable without upstream internet.
+- Comparison quality flags and eligibility reasons must match exactly between independent and production implementations.
 
 ---
 
@@ -39,11 +40,29 @@
 - Create: `scripts/release/validate_production_analytics.py`
 - Create: `release-evidence/analytics-recompute.example.json` documentation schema only.
 
+Exact acceptance tolerances:
+```text
+comparison_duration_s:
+  exact equality after integer-second normalization used by the API
+
+passive_energy_mj, adaptive_energy_mj:
+  absolute difference <= max(0.001 mJ, 0.1% of independent value)
+
+gain_pct:
+  absolute difference <= 0.05 percentage points
+
+coverage fractions / duty fractions:
+  absolute difference <= 0.001
+
+eligibility boolean, evidence_class, quality flags, reason codes:
+  exact equality
+```
+
 - [ ] Fetch production analytics API output for selected release experiments.
 - [ ] Recompute from export/raw evidence independently.
-- [ ] Compare passive energy, adaptive energy, comparison duration, coverage/quality flags, and gain percentage within documented numeric tolerances.
-- [ ] Verify production UI headline matches API and independent result.
-- [ ] Verify any ineligible comparison appears as unavailable with the same core reason category.
+- [ ] Compare passive energy, adaptive energy, comparison duration, coverage/quality flags, and gain percentage using the exact tolerances above.
+- [ ] Verify production UI headline matches API and independent result, with displayed rounding no looser than the UI's documented formatter.
+- [ ] Verify any ineligible comparison appears as unavailable with the same reason code/category.
 - [ ] Classify disagreement affecting headline judging as BLOCKER.
 - [ ] Commit `test: validate BioVolt production analytics independently`.
 
@@ -79,7 +98,8 @@
 - Create: `docs/release/demo-rehearsal.md`
 
 - [ ] Run the demo from a fresh production start using the runbook, with upstream internet disabled for the primary rehearsal.
-- [ ] Time startup-to-ready and each demo section.
+- [ ] Require production stack + real-device live state within the Phase 9.2 cold-start thresholds before starting the judged sequence.
+- [ ] Target the core judged sequence at 5 minutes or less; if the event gives a different official slot, update only this timing line before implementation and keep the same ordered flow.
 - [ ] Require no undocumented shell/source edits during the rehearsal.
 - [ ] Have a teammate follow the runbook who did not author the current implementation step, and record ambiguous instructions.
 - [ ] Verify every headline number can be traced to an experiment/calibration/provenance screen or export.
@@ -96,7 +116,7 @@
 - [ ] Require Phase 9.2 resilience gate PASS.
 - [ ] Require Phase 9.3 product gate PASS.
 - [ ] Require Phase 8 public-security acceptance PASS.
-- [ ] Require independent analytics comparison PASS.
+- [ ] Require independent analytics comparison PASS under the exact tolerances above.
 - [ ] Require production backend/frontend/firmware/contract test suites PASS.
 - [ ] Verify secrets are absent from release evidence and git-tracked files.
 - [ ] Emit final machine-readable release status: `PASS` or `FAIL`, with every failed gate listed.
@@ -116,7 +136,7 @@
 - [ ] Commit `docs: freeze BioVolt release-candidate configuration`.
 
 ## Exit Criteria
-- [ ] Independent A/B analytics match production outputs within tolerance.
+- [ ] Independent A/B analytics match production outputs within the exact tolerances above.
 - [ ] Ineligible/negative/synthetic comparisons are represented honestly.
 - [ ] Offline demo runbook is complete and rehearsed.
 - [ ] Every headline claim is traceable to evidence/provenance.
