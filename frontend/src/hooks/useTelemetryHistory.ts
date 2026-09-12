@@ -45,9 +45,6 @@ export function useTelemetryHistory(
     let active = true
 
     if (deviceId === null || cellId === null) {
-      queueMicrotask(() => {
-        if (active) setState({ data: [], loading: false, error: null })
-      })
       return () => {
         active = false
       }
@@ -79,5 +76,8 @@ export function useTelemetryHistory(
     }
   }, [cellId, deviceId, limit, reloadVersion])
 
-  return { ...state, reload }
+  const visibleState =
+    deviceId === null || cellId === null ? { data: [], loading: false, error: null } : state
+
+  return { ...visibleState, reload }
 }
