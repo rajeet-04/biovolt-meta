@@ -2,9 +2,9 @@
 """Run a short acceptance check against a running Phase 1 stack.
 
 The script deliberately uses only the Python standard library so it can be
-run from the repository root without installing another client package.  It
+run from the repository root without installing another client package. It
 does not start or stop Docker services and never accepts a token argument;
-authentication is handled by the simulator already connected to the backend.
+authentication is handled by the connected device.
 """
 
 from __future__ import annotations
