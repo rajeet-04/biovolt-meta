@@ -113,20 +113,52 @@ Canonical states:
 loading
 live
 stale
+device_disconnected
 backend_disconnected
 cached_offline
 no_data
 error
 ```
 
-State decision uses telemetry/server timestamps and connection status, not animation or styling heuristics.
+Exact decision rules for the hackathon release:
 
-- [ ] Define thresholds from actual backend cadence.
-- [ ] Write tests for every transition and recovery.
-- [ ] Show last valid timestamp/age whenever not live.
+```text
+live
+  dashboard WebSocket connected
+  AND backend reachable
+  AND latest valid telemetry age <= 2.0 s
+
+stale
+  backend reachable
+  AND latest valid telemetry exists
+  AND telemetry age > 2.0 s and <= 6.0 s
+
+device_disconnected
+  backend reachable
+  AND (backend device status is disconnected
+       OR latest telemetry age > 6.0 s)
+
+backend_disconnected
+  dashboard WebSocket unavailable
+  AND backend health/status cannot be reached
+
+cached_offline
+  live/backend path unavailable
+  AND a timestamped Dexie/IndexedDB cache is intentionally being displayed
+
+no_data
+  backend reachable
+  AND no telemetry has ever been received for the selected source
+```
+
+`error` is reserved for invalid/unhandled response state, not ordinary device/network loss. `loading` exists only until enough information is available to select one of the above states.
+
+- [ ] Write tests for every threshold boundary: exactly 2.0 s, just above 2.0 s, exactly 6.0 s, and just above 6.0 s.
+- [ ] Write tests for device-disconnected versus backend-disconnected so those states cannot collapse into one generic offline banner.
+- [ ] Show last valid timestamp/age whenever not live and a previous frame exists.
 - [ ] Cached state says `Showing cached data` with captured timestamp.
 - [ ] Cached numbers remain visually static and are never animated as fresh updates.
-- [ ] After reconnect, clear stale/offline state only after genuinely fresh telemetry arrives.
+- [ ] After reconnect, clear stale/offline/disconnected state only after genuinely fresh telemetry with a newer server timestamp arrives.
 - [ ] Commit `feat: make BioVolt data freshness explicit`.
 
 ---
@@ -181,6 +213,7 @@ Copy contract must freeze exact user-facing terms for:
 - Read-only judge view
 - Live
 - Stale
+- Device disconnected
 - Backend disconnected
 - Showing cached data
 - Simulation / demo data
@@ -259,7 +292,7 @@ open local URL
 ```text
 live
 -> backend/network interruption
--> stale/offline state
+-> stale/offline/disconnected state
 -> no stale write replay
 -> reconnect
 -> fresh telemetry resumes
@@ -275,7 +308,7 @@ live
 - [ ] Public mode is unmistakably read-only.
 - [ ] No unavailable action looks executable.
 - [ ] Operator mode retains local workflows.
-- [ ] Cached/stale data cannot be confused with live measurements.
+- [ ] Cached/stale/device-disconnected/backend-disconnected data cannot be confused with live measurements.
 - [ ] Mutation requests are never queued/replayed by service worker.
 - [ ] Synthetic/demo provenance remains visible everywhere relevant.
 - [ ] Ineligible results render `Unavailable` with reason, not invented metrics.
