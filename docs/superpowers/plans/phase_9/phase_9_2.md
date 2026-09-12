@@ -1,22 +1,37 @@
-# Phase 9.2: Cold-Start, Failure, and Soak Validation Implementation Plan
+# Phase 9.2: Cold-Start, Failure, Hardware-Safety, and Soak Validation Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to execute this plan task-by-task. Apply Ponytail product-design reasoning to every real failure/recovery state observed during HIL and production drills. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Prove BioVolt remains safe and recoverable through the failure modes most likely during a hackathon demo and during a sustained hardware run.
+**Goal:** Prove BioVolt remains safe, truthful, and recoverable through the failure modes most likely during a hackathon demo and during a sustained real-hardware run.
 
-**Architecture:** Automated acceptance covers container/process failures, persistence, and telemetry continuity; physical HIL procedures cover ESP32 power, hotspot loss, sensor removal, and actuator safety. The final soak combines both normal operation and controlled interruptions.
+**Architecture:** Automated acceptance covers container/process failures, persistence, and telemetry continuity. Physical HIL procedures cover ESP32 power, hotspot loss, sensor removal, and actuator safety. The final soak combines normal operation and controlled interruptions. Every technical failure has a corresponding PWA state assertion so a technically safe system cannot pass while visually misrepresenting stale or failed data.
 
-**Tech Stack:** Docker Compose, PlatformIO serial monitor/status output, production PWA, FastAPI health/status APIs, physical ESP32 and sensors.
+**Tech Stack:** Docker Compose, PlatformIO serial/status output, production PWA, FastAPI health/status APIs, physical ESP32 and sensors, Python release scripts.
 
 **Spec:** `docs/superpowers/plans/phase_9/phase_9_0.md`
 
-## Global Constraints
-- ESP32 local safety/control continues when laptop/backend/network is unavailable.
-- No stale control command is queued for later replay.
-- Reconnect does not fabricate missing telemetry or energy.
-- Hardware failure tests never bypass electrical/current limits or actuator safety constraints.
-- Final release soak duration is exactly 60 minutes minimum, not optional.
-- After a backend or hotspot path is restored, device WebSocket plus fresh telemetry must recover within 30 seconds or the drill fails.
+## Frozen Release Thresholds
+
+```text
+Compose mandatory services healthy <= 90 s
+ESP32 authenticated device WebSocket + fresh telemetry after path restored <= 30 s
+Nginx browser path recovery after Nginx health <= 15 s
+healthy-network telemetry silence failure > 10 s
+PWA Live state only after genuinely fresh telemetry
+final real-hardware soak >= 60 continuous min
+soak observation interval <= 5 min
+unexpected ESP32 reboot = 0
+actuator safety violation = 0
+stale command replay = 0
+data corruption/loss = 0
+```
+
+Free-heap guard after 5-minute warmup:
+- final free heap >= 85% of stabilized baseline unless a documented one-time allocation explains the change
+- no sustained monotonic downward trend across repeated observations
+- progressive loss >10% without recovery is MAJOR pending investigation even before 85% threshold is crossed
+
+Do not relax these after observing results.
 
 ---
 
@@ -26,100 +41,259 @@
 - Create: `docs/release/cold-start-drill.md`
 - Create: `scripts/release/validate_cold_start.py`
 
-Acceptance thresholds per run:
+Sequence:
+
 ```text
-Compose mandatory services healthy <= 60 s after command
-ESP32 Wi-Fi connected <= 30 s after device power-on
-/ws/device authenticated <= 60 s after device power-on
-first valid telemetry persisted <= 75 s after device power-on
-PWA state becomes live <= 90 s after device power-on
+ESP32 off + production stack stopped
+-> start laptop hotspot
+-> docker compose up -d
+-> PWA shows waiting/disconnected truthfully
+-> power ESP32
+-> Wi-Fi connects
+-> /ws/device authenticates
+-> valid telemetry persists
+-> PWA becomes Live
 ```
 
-- [ ] Start from powered-down ESP32 and stopped production Compose stack.
-- [ ] Start laptop hotspot and `docker compose up -d` using prepared `.env`.
-- [ ] Power ESP32 and record time to Wi-Fi connection, device WebSocket, first valid telemetry, and PWA live state.
-- [ ] Require all thresholds above to pass without upstream internet.
+- [ ] Run without upstream internet.
+- [ ] Require mandatory containers healthy <=90 s.
+- [ ] Require device WebSocket + fresh telemetry within 30 s of network/backend availability after normal boot provisioning settles.
 - [ ] Verify no actuator starts unexpectedly during boot.
-- [ ] Repeat the drill three times; all three runs must pass.
+- [ ] Verify no fake/old live metrics appear before device telemetry.
+- [ ] Repeat three times; all runs pass.
+- [ ] Save timing report to release evidence.
 - [ ] Commit `test: add BioVolt release cold-start drill`.
 
-### Task 2: Controlled failure matrix
+---
+
+### Task 2: Controlled service/network failure matrix
 
 **Files:**
 - Create: `docs/release/failure-matrix.md`
 - Create: `scripts/release/validate_failures.py`
 
-- [ ] Backend restart while ESP32 remains powered: verify no unsafe actuator change; after backend health returns, authenticated device WebSocket plus genuinely fresh telemetry must recover within 30 s.
-- [ ] Nginx restart: verify backend persistence continues; after Nginx health returns, browser API/WebSocket access must recover within 15 s.
-- [ ] Laptop hotspot off for 20 s then on: verify ESP32 sensing/control continues, telemetry gap is visible, and authenticated device telemetry recovers within 30 s of hotspot restoration.
-- [ ] Upstream internet off/on: verify zero impact on local sensing, persistence, control, and PWA.
-- [ ] Cloudflared stop/start: verify zero impact on local operation.
-- [ ] Browser/PWA refresh during active monitoring: verify state reload without command replay and live state returns within 10 s when backend/device are healthy.
-- [ ] Record expected user-visible state for each failure and recovery.
+Scenarios:
+
+**Backend restart**
+- local firmware safety continues
+- PWA moves to stale/backend-disconnected
+- device reconnect + fresh telemetry <=30 s after backend available
+- no missing-interval energy integration
+- no stale write replay
+
+**Nginx restart**
+- backend persistence continues
+- browser/device proxy paths recover
+- browser path usable <=15 s after Nginx health
+
+**Laptop hotspot off for 20 s**
+- ESP32 remains powered
+- Sensor/Control/Actuator tasks continue
+- sequence gap becomes visible
+- fresh device telemetry <=30 s after hotspot restoration
+
+**Upstream internet off/on**
+- zero core local impact
+
+**Cloudflared stop/start**
+- zero local impact
+
+**Browser/PWA refresh**
+- no command replay
+- fresh state restored from backend/device truth
+
+- [ ] Record technical result and user-visible state for each scenario.
 - [ ] Commit `test: validate BioVolt release failure matrix`.
+
+---
 
 ### Task 3: Sensor fault HIL checks
 
 **Files:**
 - Create: `docs/release/sensor-fault-drill.md`
+- Create: `scripts/release/validate_sensor_faults.py`
 
-- [ ] Disconnect DS18B20 and verify `temperature_c=null`, health false, no ESP32 reboot.
-- [ ] Disconnect BH1750 and verify `lux=null`, health false.
-- [ ] Disconnect/interrupt ADS1115 path and verify electrical/optical health behavior follows Phase 3 rules.
-- [ ] Verify the PWA renders unavailable values rather than zero or fabricated values.
-- [ ] Restore each sensor and verify recovery without full-system restart where supported.
-- [ ] Record any fault that can affect adaptive operation and verify safety/control fallback.
-- [ ] Commit `test: document BioVolt sensor fault release drill`.
+Where electrically safe, disconnect/reconnect:
+- DS18B20
+- BH1750
+- ADS1115/BPV path
+- BPW34 optical path
+
+Expected:
+
+```text
+failed sensor
+-> corresponding value null/unavailable
+-> health false
+-> no fabricated zero
+-> unrelated acquisition continues
+-> derived eligibility updates truthfully
+-> PWA identifies unavailable data
+```
+
+- [ ] Verify no ESP32 reboot from routine sensor loss.
+- [ ] Verify DS18B20 loss yields `temperature_c=null`.
+- [ ] Verify BH1750 loss yields `lux=null`.
+- [ ] Verify optical failure makes OD680/biomass/CO2 unavailable when required.
+- [ ] Verify sensor recovery where supported without full-system restart.
+- [ ] Commit `test: validate BioVolt sensor fault release drill`.
+
+---
 
 ### Task 4: Actuator safety HIL checks
 
 **Files:**
 - Create: `docs/release/actuator-safety-drill.md`
+- Create: `scripts/release/validate_actuator_events.py`
 
-- [ ] Verify boot state: grow LED PWM 0, mixer off, monitor mode.
-- [ ] Attempt out-of-range PWM command and verify firmware clamps/rejects according to the Phase 3 safety policy.
-- [ ] Run mixer to maximum runtime and verify forced off at the configured limit, with timing tolerance no greater than 250 ms beyond the firmware task/check interval.
-- [ ] Attempt mixer restart during cooldown and verify rejection.
+- [ ] Verify boot state: grow LED PWM safe/off, mixer off, monitor/safe baseline.
+- [ ] Attempt below/above-range PWM and verify clamp/rejection according to firmware policy.
+- [ ] Run mixer to maximum runtime and verify forced off within firmware timing tolerance.
+- [ ] Attempt mixer restart during cooldown and require rejection.
 - [ ] Disconnect backend during active/manual operation and verify local safety remains authoritative.
-- [ ] Trigger adaptive/manual ownership transitions and verify no conflicting actuator writer exists.
+- [ ] Exercise Adaptive -> Manual/Stop ownership transition and verify optimizer cannot continue writing after preemption.
+- [ ] Record command IDs/ACK/rejection and resulting actuator telemetry.
 - [ ] Classify any unsafe behavior as BLOCKER.
 - [ ] Commit `test: validate BioVolt actuator safety HIL`.
 
-### Task 5: 60-minute hardware soak with controlled interruptions
+---
+
+### Task 5: Ponytail real-failure comprehension audit
+
+**Files:**
+- Create: `docs/release/recovery-ux-observations.md`
+- Evidence: `release-evidence/screenshots/failure-states/`
+
+During Tasks 2-4 capture production screens for:
+- backend disconnected
+- device disconnected
+- stale telemetry
+- cached/offline
+- sensor unavailable
+- invalid calibration/derived metric unavailable
+- public tunnel unavailable while local stack is healthy
+
+For each state answer:
+
+```text
+What failed?
+Is currently displayed data live, stale, cached, or unavailable?
+What remains safe/available?
+What is the next useful operator action?
+Does recovery become visible only after real healthy evidence?
+```
+
+Ponytail acceptance:
+- one dominant diagnosis per failure state
+- no contradictory banners
+- no raw stack trace as primary UI
+- technical details can remain in diagnostics/log view
+- read-only judge mode never suggests a recovery action requiring operator privileges
+- `Unavailable` is not presented as zero
+
+- [ ] Capture desktop and at least one narrow/mobile state for critical failures.
+- [ ] Classify misleading live/stale/recovery presentation as MAJOR.
+- [ ] Commit `docs: add Ponytail BioVolt real-failure UX audit`.
+
+---
+
+### Task 6: 60-minute real-hardware soak with controlled interruptions
 
 **Files:**
 - Create: `scripts/release/record_soak.py`
+- Create: `scripts/release/analyze_soak.py`
 - Create: `docs/release/soak-procedure.md`
 
-**Required duration:** at least 60 continuous minutes from first healthy telemetry frame to final sample.
+**Required duration:** >=60 continuous minutes from first healthy telemetry frame to final sample.
 
-- [ ] Record every 5 minutes: ESP32 uptime, sequence, free heap, Wi-Fi state, WebSocket state, sensor health, actuator state, backend health, telemetry age, DB row growth.
-- [ ] Include one backend restart between minute 15 and minute 25.
-- [ ] Include one 20-second hotspot interruption between minute 30 and minute 40.
-- [ ] Include one browser/PWA restart between minute 45 and minute 55.
-- [ ] After each backend/hotspot restoration, require authenticated device WebSocket plus fresh telemetry within 30 s.
-- [ ] Verify no unexplained ESP32 reboot, runaway actuator, progressive heap collapse, corrupt DB rows, or permanently stale dashboard.
-- [ ] Treat progressive free-heap loss greater than 10% from the stabilized 5-minute baseline, without later recovery, as MAJOR pending investigation.
-- [ ] Verify telemetry sequence gaps correspond to observed interruptions and are not hidden.
-- [ ] Produce `soak-report.json` for the release evidence pack.
+Record <= every 5 minutes:
+
+```text
+wall-clock time
+ESP32 uptime_ms
+sequence
+free_heap_bytes
+Wi-Fi state
+WebSocket state
+sensor health
+mode
+LED PWM
+mixer state
+backend/Nginx health
+telemetry age
+DB row count/file size
+container memory
+```
+
+Controlled interruptions:
+- one backend restart between minute 15-25
+- one 20-second hotspot interruption between minute 30-40
+- one browser/PWA restart between minute 45-55
+
+Failure conditions:
+- unexpected ESP32 reboot
+- actuator safety violation
+- healthy-network telemetry silence >10 s
+- unrecovered backend/Nginx failure
+- corrupt persistence
+- progressive free-heap collapse
+- unbounded process/browser growth pattern
+- stale/cached state shown as live
+
+- [ ] Establish stabilized 5-minute heap baseline.
+- [ ] Execute all controlled interruptions.
+- [ ] Require each backend/hotspot recovery to meet 30 s device/fresh-telemetry limit.
+- [ ] Verify sequence gaps correspond to known interruptions and are not hidden.
+- [ ] Verify final experiment/history/export remains readable.
+- [ ] Emit `soak-report.json`.
 - [ ] Commit `test: add BioVolt release hardware soak`.
 
-### Task 6: Resilience release gate
+---
+
+### Task 7: Persistence and continuity review after soak
+
+**Files:**
+- Create: `scripts/release/validate_post_soak_data.py`
+
+- [ ] Verify SQLite integrity check passes.
+- [ ] Verify no duplicate/invalid experiment identity caused by restarts.
+- [ ] Verify calibration revision references remain resolvable.
+- [ ] Verify energy accumulator did not bridge controlled sequence gaps.
+- [ ] Verify completed experiment exports regenerate/read correctly.
+- [ ] Commit `test: validate BioVolt post-soak persistence integrity`.
+
+---
+
+### Task 8: Resilience release gate
 
 **Files:**
 - Create: `scripts/release/phase9_resilience_gate.py`
 
-- [ ] Aggregate cold-start, failure, sensor fault, actuator safety, and soak results.
-- [ ] Require zero unsafe actuator events.
+Aggregate:
+- cold start
+- controlled failure matrix
+- sensor faults
+- actuator safety
+- Ponytail failure-state audit
+- soak
+- post-soak persistence
+
+- [ ] Require zero actuator safety events.
 - [ ] Require zero unexplained reboot/data-corruption events.
-- [ ] Require every planned backend/hotspot recovery to meet the 30 s device-telemetry recovery limit.
-- [ ] Require the full 60-minute soak duration.
-- [ ] Classify unrecoverable core failures as MAJOR or BLOCKER per Phase 9 overview.
+- [ ] Require all planned network/service recovery thresholds.
+- [ ] Require full 60-minute soak.
+- [ ] BLOCKER on unsafe actuator behavior, data corruption, or core internet dependency.
+- [ ] MAJOR on misleading failure-state UX, unreliable reconnect, or resource degradation.
+- [ ] Require zero BLOCKER and zero MAJOR findings.
 - [ ] Commit `test: add BioVolt resilience release gate`.
 
 ## Exit Criteria
-- [ ] Three cold-start runs pass exact readiness thresholds without internet.
-- [ ] Backend/Nginx/hotspot/internet/Cloudflared/browser interruptions recover within their defined thresholds.
-- [ ] Sensor faults are represented explicitly and do not fabricate values.
-- [ ] Actuator safety holds during disconnects and invalid commands.
-- [ ] 60-minute final soak passes with no BLOCKER/MAJOR resilience issue.
+
+- [ ] Three cold starts pass without internet.
+- [ ] Backend/Nginx/hotspot/internet/Cloudflared/browser interruptions recover within defined thresholds.
+- [ ] Sensor faults are explicit and never fabricate readings.
+- [ ] Actuator safety holds through invalid commands and disconnects.
+- [ ] Failure/recovery UX communicates technical truth.
+- [ ] 60-minute real-hardware soak passes.
+- [ ] Post-soak data/provenance integrity passes.
+- [ ] Zero BLOCKER and zero MAJOR resilience findings remain.
