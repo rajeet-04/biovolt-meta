@@ -15,6 +15,24 @@ REQUIRED_FILES = [
     "docs/protocols/versioning.md",
 ]
 
+REQUIRED_FILES += [
+    "requirements-contracts.txt",
+    "scripts/validate_schemas.py",
+    ".github/workflows/contracts.yml",
+    "shared/schemas/device-telemetry.v1.schema.json",
+    "shared/schemas/processed-telemetry.v1.schema.json",
+    "shared/schemas/device-command.v1.schema.json",
+    "shared/schemas/calibration-profile.v1.schema.json",
+    "shared/schemas/experiment.v1.schema.json",
+    "shared/schemas/system-event.v1.schema.json",
+    "shared/examples/device-telemetry.example.json",
+    "shared/examples/processed-telemetry.example.json",
+    "shared/examples/device-command.example.json",
+    "shared/examples/calibration-profile.example.json",
+    "shared/examples/experiment.example.json",
+    "shared/examples/system-event.example.json",
+]
+
 FORBIDDEN_PHASE_ZERO_FILES = [
     "docker-compose.yml",
     "backend/app/main.py",
