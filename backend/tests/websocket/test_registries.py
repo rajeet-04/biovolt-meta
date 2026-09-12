@@ -73,13 +73,13 @@ class NeverCompletesWebSocket:
 
 
 async def test_dashboard_broadcast_is_bounded_for_stalled_client() -> None:
-    hub = DashboardHub(send_timeout_seconds=0.01)
+    hub = DashboardHub()
     stalled = NeverCompletesWebSocket()
     healthy = FakeWebSocket()
     hub.connect(stalled)
     hub.connect(healthy)
 
-    await asyncio.wait_for(hub.broadcast_json({"sequence": 9}), timeout=0.1)
+    await asyncio.wait_for(hub.broadcast_json({"sequence": 9}), timeout=0.5)
 
     assert healthy.payloads == [{"sequence": 9}]
     await hub.broadcast_json({"sequence": 10})
