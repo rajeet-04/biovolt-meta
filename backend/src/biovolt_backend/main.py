@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from biovolt_backend.api.health import router as health_router
+from biovolt_backend.api.status import router as status_router
+from biovolt_backend.api.telemetry import router as telemetry_router
 from biovolt_backend.config import Settings
 from biovolt_backend.domain.energy import EnergyAccumulator
 from biovolt_backend.domain.processing import ProcessingConfig
@@ -52,6 +54,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title=resolved.app_name, lifespan=lifespan)
     app.state.settings = resolved
     app.include_router(health_router)
+    app.include_router(status_router)
+    app.include_router(telemetry_router)
     app.include_router(websocket_router)
     return app
 
