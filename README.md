@@ -168,3 +168,21 @@ device tokens.
 ## Scientific Ownership Rule
 
 Raw ESP32 telemetry contains measured/control-state values only. Current, power, OD680, biomass, estimated CO2 biofixed into biomass, cumulative energy, and server timestamps are derived by the backend.
+
+## Release validation
+
+The Phase 9 release checks run in GitHub Actions and can be repeated locally
+with `uv run --extra dev pytest tests/release -q` and
+`uv run --extra dev python scripts/release/phase9_science_gate.py --root .`.
+Use `--profile simulator` for hardware-free development; the UI labels those
+frames `Simulation / demo data`, and synthetic evidence never becomes a
+measured-performance claim. Build a non-sensitive evidence index with
+`uv run --extra dev python scripts/release/build_evidence_index.py release-evidence --output release-evidence/index.json`.
+The resilience, product, and final gates fail closed until real HIL, soak,
+journey, screenshot, security, and traceability evidence is supplied.
+CI also runs a 60-minute-equivalent deterministic simulator smoke with an
+explicit sensor-fault frame; this validates the hardware placeholder path but
+is never treated as physical HIL evidence.
+The simulation-only candidate gate reports `PASS` with
+`hardware_release: false`; the real release-candidate gate remains fail-closed
+until measured evidence is available.
