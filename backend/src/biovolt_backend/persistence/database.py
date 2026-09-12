@@ -26,5 +26,9 @@ def create_engine_and_session(
 async def init_database(engine: AsyncEngine) -> None:
     """Create all registered persistence tables."""
 
+    # Register ORM tables before creating metadata. The local import avoids a
+    # module cycle because models inherit from Base defined in this module.
+    from biovolt_backend.persistence import models  # noqa: F401
+
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
