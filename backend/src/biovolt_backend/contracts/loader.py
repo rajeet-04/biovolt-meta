@@ -1,19 +1,18 @@
 import json
-from datetime import datetime
 from functools import cache
 from pathlib import Path
 
 from jsonschema import Draft202012Validator, FormatChecker
+from rfc3339_validator import validate_rfc3339
 
 
 def _is_rfc3339_datetime(value: object) -> bool:
     if not isinstance(value, str) or len(value) < 11 or value[10] not in "Tt":
         return False
-    try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return False
-    return parsed.tzinfo is not None and parsed.utcoffset() is not None
+    normalized = value[:10] + "T" + value[11:]
+    if normalized.endswith("z"):
+        normalized = normalized[:-1] + "Z"
+    return bool(validate_rfc3339(normalized))
 
 
 _FORMAT_CHECKER = FormatChecker()

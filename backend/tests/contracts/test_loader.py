@@ -31,3 +31,35 @@ def test_processed_payload_with_invalid_timestamp_is_rejected():
 
     with pytest.raises(ValidationError):
         validate_payload("processed-telemetry.v1.schema.json", payload)
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    [
+        "2026-08-23T17:30Z",
+        "2026-08-23T17:30:15+0530",
+        "2026-08-23T17:30:15,124Z",
+        "2026-W34-7T17:30:15Z",
+        "2026-08-23T17:30:15+05:30:15",
+    ],
+)
+def test_processed_payload_rejects_non_rfc3339_timestamp_forms(timestamp):
+    repo = Path(__file__).resolve().parents[3]
+    payload = json.loads(
+        (repo / "shared/examples/processed-telemetry.example.json").read_text(encoding="utf-8")
+    )
+    payload["timestamp"] = timestamp
+
+    with pytest.raises(ValidationError):
+        validate_payload("processed-telemetry.v1.schema.json", payload)
+
+
+@pytest.mark.parametrize("timestamp", ["2026-08-23t17:30:15z", "2026-08-23t17:30:15+05:30"])
+def test_processed_payload_accepts_rfc3339_lowercase_markers(timestamp):
+    repo = Path(__file__).resolve().parents[3]
+    payload = json.loads(
+        (repo / "shared/examples/processed-telemetry.example.json").read_text(encoding="utf-8")
+    )
+    payload["timestamp"] = timestamp
+
+    validate_payload("processed-telemetry.v1.schema.json", payload)
