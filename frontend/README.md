@@ -25,3 +25,13 @@ npm run build
 Phase 2.1 does not connect to the backend or calculate telemetry. Backend
 integration begins in Phase 2.2; scientific derivations remain owned by the
 backend contract.
+
+## Docker / preview proxy
+
+`frontend/Dockerfile` builds the PWA and starts `vite preview` on port 4173.
+Both the dev server and the preview server route `/api` and `/ws` through the
+same proxy target, controlled by `BIOVOLT_PROXY_TARGET` (default
+`http://localhost:8000`). The container sets
+`BIOVOLT_PROXY_TARGET=http://backend:8000` so it can reach the FastAPI service
+in `docker compose --profile frontend`. Override it with `--build-arg` or
+`docker run -e BIOVOLT_PROXY_TARGET=...` to point at another host.
