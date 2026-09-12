@@ -7,6 +7,8 @@ COPY backend/src /app/backend/src
 COPY shared/schemas /app/shared/schemas
 COPY shared/examples /app/shared/examples
 
+ENV PYTHONPATH=/app/backend/src
+
 RUN pip install --no-cache-dir /app/backend
 
 WORKDIR /app/backend
