@@ -41,7 +41,7 @@ Produces:
 - FastAPI app factory
 - typed settings
 - `/api/health`
-- test database fixture
+- test configuration
 - backend lint/test commands
 
 ### Module 1.2: Contract Adapters and Scientific Calculation Core
@@ -72,10 +72,13 @@ Produces:
 - `/ws/device`
 - device token authentication
 - schema validation on every raw frame
+- telemetry orchestration service
 - connection registry
 - `/ws/dashboard`
 - processed telemetry broadcast
 - `/api/system/status`
+- `/api/telemetry/latest`
+- `/api/telemetry/history`
 - stale-device tracking
 
 ### Module 1.5: Deterministic ESP32 Simulator
@@ -94,9 +97,10 @@ Plan: `docs/superpowers/plans/phase_1/phase_1_6.md`
 
 Produces:
 - root Docker Compose backend + simulator profile
-- backend Dockerfile
-- integration tests across WebSocket → processing → SQLite → dashboard
+- backend and simulator Dockerfiles
+- integration tests across WebSocket -> processing -> SQLite -> dashboard
 - GitHub Actions backend workflow
+- short smoke test
 - 30-minute soak-test script
 - Phase 1 acceptance checklist
 
@@ -126,14 +130,13 @@ Phase 0 merged
 1.6 Integration + Docker + CI + soak
 ```
 
-Modules are intentionally sequential because the WebSocket layer consumes domain models and persistence interfaces, while the simulator must target the final device gateway contract.
-
-## Planned Backend Structure After Phase 1
+## Planned Repository State After Phase 1
 
 ```text
 backend/
 ├── pyproject.toml
 ├── Dockerfile
+├── .dockerignore
 ├── README.md
 ├── src/
 │   └── biovolt_backend/
@@ -143,7 +146,8 @@ backend/
 │       ├── api/
 │       │   ├── __init__.py
 │       │   ├── health.py
-│       │   └── status.py
+│       │   ├── status.py
+│       │   └── telemetry.py
 │       ├── contracts/
 │       │   ├── __init__.py
 │       │   ├── loader.py
@@ -158,7 +162,11 @@ backend/
 │       │   ├── __init__.py
 │       │   ├── database.py
 │       │   ├── models.py
+│       │   ├── throttle.py
 │       │   └── telemetry_repository.py
+│       ├── services/
+│       │   ├── __init__.py
+│       │   └── telemetry_service.py
 │       └── websocket/
 │           ├── __init__.py
 │           ├── auth.py
@@ -167,16 +175,22 @@ backend/
 │           └── routes.py
 └── tests/
     ├── conftest.py
+    ├── test_package.py
+    ├── test_config.py
     ├── test_health.py
+    ├── test_lifespan.py
+    ├── api/
     ├── contracts/
     ├── domain/
     ├── persistence/
+    ├── services/
     ├── websocket/
     └── integration/
 
 simulator/
 ├── pyproject.toml
 ├── Dockerfile
+├── .dockerignore
 ├── README.md
 ├── src/
 │   └── biovolt_simulator/
@@ -184,12 +198,14 @@ simulator/
 │       ├── __main__.py
 │       ├── config.py
 │       ├── generator.py
+│       ├── faults.py
 │       └── client.py
 └── tests/
 
 docker-compose.yml
 .env.example
 .github/workflows/backend.yml
+scripts/phase1_smoke.py
 scripts/soak_phase1.py
 ```
 
@@ -209,7 +225,7 @@ Phase 0 JSON Schema validation
 Pydantic DeviceTelemetryV1
           |
           v
-TelemetryProcessor
+TelemetryService
   - server UTC timestamp
   - current_ua
   - power_uw
@@ -228,41 +244,32 @@ TelemetryProcessor
 ## Phase 1 Scientific Rules
 
 ### Current
-For `voltage_mv` and `load_resistance_ohm`:
 
 ```text
 current_ua = voltage_mv * 1000 / load_resistance_ohm
 ```
 
 ### Power
-With voltage represented in millivolts:
 
 ```text
 power_uw = voltage_mv ** 2 / load_resistance_ohm
 ```
 
 ### Energy
-For consecutive powers in microwatts and elapsed seconds:
 
 ```text
 delta_energy_mj = ((previous_power_uw + current_power_uw) / 2) * dt_seconds / 1000
 ```
 
-Use trapezoidal integration. Device `uptime_ms` is the primary integration timebase because it is resilient to server scheduling jitter. If uptime decreases, treat it as a device restart and reset the boot-session accumulator.
+Use trapezoidal integration. Device `uptime_ms` is the primary integration timebase. If uptime decreases, treat it as a device restart and reset the boot-session accumulator.
 
 ### OD680
-If `sample`, `dark`, and `blank` are valid:
 
 ```text
 od680 = -log10((sample - dark) / (blank - dark))
 ```
 
-Return `null` when:
-- `blank <= dark`
-- `sample <= dark`
-- required optical references are absent
-
-Do not silently clamp invalid optical data into plausible OD values.
+Return `null` when required optical references are missing or physically invalid. Do not silently clamp invalid optical data into plausible OD values.
 
 ## Phase 1 REST/WS Surface
 
@@ -274,6 +281,8 @@ GET /api/system/status
 GET /api/telemetry/latest?device_id=...&cell_id=...
 GET /api/telemetry/history?device_id=...&cell_id=...&limit=...
 ```
+
+`/api/health` is the lightweight process/service health check. Database and connected-device health/freshness are reported by `/api/system/status`.
 
 Experiment REST endpoints are intentionally deferred.
 
@@ -307,7 +316,8 @@ Each commit must pass every test introduced up to that commit.
 ## Phase 1 Exit Criteria
 
 - [ ] Phase 0 contract validation still passes unchanged.
-- [ ] `GET /api/health` returns healthy backend/database state.
+- [ ] `GET /api/health` returns healthy backend process state.
+- [ ] `GET /api/system/status` reports database state and connected-device freshness.
 - [ ] Canonical raw Phase 0 example is accepted by the backend contract adapter.
 - [ ] Malformed raw telemetry is rejected and is not persisted or broadcast.
 - [ ] Device WebSocket rejects missing/wrong credentials.
@@ -322,9 +332,8 @@ Each commit must pass every test introduced up to that commit.
 - [ ] `GET /api/telemetry/latest` returns latest processed data.
 - [ ] `GET /api/telemetry/history` returns bounded chronological data.
 - [ ] Sensor `null` values remain null and do not become fake zeroes.
-- [ ] System status exposes connected device count, device IDs, and latest telemetry age.
 - [ ] Simulator can intentionally emit a sensor-null frame and backend handles it.
-- [ ] Simulator can intentionally emit malformed JSON/schema data and backend rejects it without disconnecting other clients.
+- [ ] Simulator can intentionally emit malformed schema data and backend rejects it without breaking unrelated clients.
 - [ ] Backend + simulator start with Docker Compose.
 - [ ] Backend unit/integration tests and Phase 0 contract tests pass in GitHub Actions.
 - [ ] A 30-minute simulator soak completes without backend crash and with expected persistence rate.
