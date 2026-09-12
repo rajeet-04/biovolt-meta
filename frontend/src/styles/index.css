@@ -2,16 +2,21 @@
 @config '../../tailwind.config.ts';
 
 :root {
-  color-scheme: dark;
-  --bg: 12 16 14;
-  --panel: 20 26 22;
-  --panel-strong: 27 35 30;
-  --text: 235 244 238;
-  --muted: 155 171 161;
-  --accent: 74 222 128;
-  --warning: 245 158 11;
-  --danger: 239 68 68;
-  --border: 52 66 57;
+  color-scheme: light;
+  --bg: 246 247 243;
+  --panel: 255 255 252;
+  --panel-strong: 233 236 229;
+  --panel-raised: 214 220 211;
+  --text: 16 23 24;
+  --muted: 67 78 80;
+  --accent: 21 75 255;
+  --accent-soft: 222 230 255;
+  --success: 0 111 78;
+  --warning: 161 87 0;
+  --danger: 176 34 50;
+  --info: 109 40 217;
+  --border: 16 23 24;
+  --focus: 21 75 255;
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -38,6 +43,16 @@ body {
   line-height: 1.5;
 }
 
+::selection {
+  background: rgb(var(--accent-soft));
+  color: rgb(var(--text));
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--focus));
+  outline-offset: 3px;
+}
+
 button,
 input,
 textarea,
@@ -59,6 +74,90 @@ samp {
 
 .min-h-screen {
   min-height: 100vh;
+}
+
+.page-title {
+  color: rgb(var(--text));
+  font-size: clamp(1.8rem, 2.2vw, 2.35rem);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+}
+
+.page-kicker {
+  color: rgb(var(--accent));
+  font-size: 0.69rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.surface {
+  border: 2px solid rgb(var(--border));
+  border-radius: 0;
+  background: rgb(var(--panel));
+  box-shadow: 5px 5px 0 rgb(var(--border)), 0 8px 16px rgb(var(--border) / 0.08);
+}
+
+.data-value {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.brutal-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 2px solid currentColor;
+  border-radius: 0;
+  padding: 0.28rem 0.5rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.accent-panel {
+  border: 2px solid rgb(var(--border));
+  background: rgb(var(--accent));
+  box-shadow: 5px 5px 0 rgb(var(--border)), 0 8px 16px rgb(var(--border) / 0.08);
+}
+
+.chart-panel {
+  border: 2px solid rgb(var(--border));
+  border-radius: 0;
+  background: rgb(var(--panel));
+  box-shadow: 4px 4px 0 rgb(var(--border)), 0 7px 14px rgb(var(--border) / 0.07);
+  padding: 1rem;
+}
+
+.chart-panel h2,
+.surface h2,
+.surface h3 {
+  letter-spacing: -0.025em;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.overview-page {
+  animation: overview-arrive 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes overview-arrive {
+  from {
+    opacity: 0.01;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

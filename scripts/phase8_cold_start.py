@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Poll the public local health endpoints after a production cold start."""
+
 import argparse
 import time
 import urllib.request
@@ -21,7 +22,7 @@ def main() -> int:
             return 0
         except OSError:
             if time.monotonic() >= deadline:
-                raise SystemExit("BioVolt production cold start timed out")
+                raise SystemExit("BioVolt production cold start timed out") from None
             time.sleep(2)
 
 
