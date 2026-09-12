@@ -1,5 +1,6 @@
 """Async SQLAlchemy engine, session, and metadata setup."""
 
+from sqlalchemy import inspect, text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -32,3 +33,22 @@ async def init_database(engine: AsyncEngine) -> None:
 
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
+        if connection.dialect.name == "sqlite":
+            await connection.run_sync(_migrate_sqlite_telemetry_resistance)
+
+
+def _migrate_sqlite_telemetry_resistance(sync_connection) -> None:
+    """Add resistance provenance to Phase 1.3 SQLite databases created earlier."""
+
+    columns = {
+        column["name"] for column in inspect(sync_connection).get_columns("telemetry_samples")
+    }
+    if "load_resistance_ohm" not in columns:
+        # Legacy rows cannot recover their original resistance; preserve them
+        # with the documented default while new writes provide exact values.
+        sync_connection.execute(
+            text(
+                "ALTER TABLE telemetry_samples "
+                "ADD COLUMN load_resistance_ohm FLOAT NOT NULL DEFAULT 100000.0"
+            )
+        )

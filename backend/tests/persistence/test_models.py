@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import inspect, select
+from sqlalchemy import inspect, select, text
 from sqlalchemy.exc import IntegrityError
 
 from biovolt_backend.persistence.database import create_engine_and_session, init_database
@@ -114,4 +114,47 @@ async def test_telemetry_sample_rejects_null_required_columns(tmp_path, required
         with pytest.raises(IntegrityError):
             await session.commit()
 
+    await engine.dispose()
+
+
+async def test_database_initialization_migrates_legacy_resistance_column(tmp_path):
+    engine, session_factory = create_engine_and_session(
+        f"sqlite+aiosqlite:///{tmp_path / 'legacy.db'}"
+    )
+    await init_database(engine)
+    async with engine.begin() as connection:
+        await connection.execute(
+            text("ALTER TABLE telemetry_samples DROP COLUMN load_resistance_ohm")
+        )
+
+    await init_database(engine)
+    async with engine.connect() as connection:
+        columns = await connection.run_sync(
+            lambda sync_connection: inspect(sync_connection).get_columns("telemetry_samples")
+        )
+    assert "load_resistance_ohm" in {column["name"] for column in columns}
+
+    sample = TelemetrySample(
+        received_at=datetime.now(UTC),
+        device_id="device-1",
+        cell_id="cell-1",
+        sequence=1,
+        uptime_ms=100,
+        load_resistance_ohm=120000.0,
+        grow_led_pwm=0,
+        mixer_on=False,
+        control_mode="monitor",
+        raw_payload_json={},
+    )
+    async with session_factory() as session:
+        session.add(sample)
+        await session.commit()
+        sample_id = sample.id
+
+    async with session_factory() as session:
+        loaded = await session.scalar(
+            select(TelemetrySample).where(TelemetrySample.id == sample_id)
+        )
+    assert loaded is not None
+    assert loaded.load_resistance_ohm == 120000.0
     await engine.dispose()
