@@ -85,6 +85,10 @@ describe('isProcessedTelemetryV1', () => {
     expect(isProcessedTelemetryV1(invalid)).toBe(false)
   })
 
+  it.each(['2026-02-29T12:00:00Z', '2026-02-31T12:00:00Z'])('rejects impossible calendar date %s', (timestamp) => {
+    expect(isProcessedTelemetryV1({ ...validTelemetry(), timestamp })).toBe(false)
+  })
+
   it('rejects unknown top-level fields', () => {
     expect(isProcessedTelemetryV1({ ...validTelemetry(), unexpected: true })).toBe(false)
   })
