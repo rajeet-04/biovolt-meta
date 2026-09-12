@@ -1,4 +1,6 @@
+import asyncio
 from datetime import UTC, datetime
+
 
 from biovolt_backend.websocket.dashboard_hub import DashboardHub
 from biovolt_backend.websocket.device_registry import DeviceRegistry
@@ -64,3 +66,22 @@ async def test_dashboard_broadcast_isolates_async_send_failures() -> None:
     await hub.broadcast_json({"sequence": 8})
 
     assert healthy.payloads == [{"sequence": 8}]
+
+
+class NeverCompletesWebSocket:
+    async def send_json(self, payload: dict[str, object]) -> None:
+        await asyncio.Event().wait()
+
+
+async def test_dashboard_broadcast_is_bounded_for_stalled_client() -> None:
+    hub = DashboardHub(send_timeout_seconds=0.01)
+    stalled = NeverCompletesWebSocket()
+    healthy = FakeWebSocket()
+    hub.connect(stalled)
+    hub.connect(healthy)
+
+    await asyncio.wait_for(hub.broadcast_json({"sequence": 9}), timeout=0.1)
+
+    assert healthy.payloads == [{"sequence": 9}]
+    await hub.broadcast_json({"sequence": 10})
+    assert healthy.payloads == [{"sequence": 9}, {"sequence": 10}]

@@ -1,5 +1,6 @@
 """Fan out processed telemetry to read-only dashboard WebSocket clients."""
 
+import asyncio
 from threading import RLock
 from typing import Any
 
@@ -7,9 +8,10 @@ from typing import Any
 class DashboardHub:
     """Maintain dashboard connections and isolate individual send failures."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, send_timeout_seconds: float = 1.0) -> None:
         self._connections: set[Any] = set()
         self._lock = RLock()
+        self._send_timeout_seconds = send_timeout_seconds
 
     def connect(self, websocket: Any) -> None:
         """Add a dashboard socket to the broadcast set."""
@@ -34,8 +36,15 @@ class DashboardHub:
         with self._lock:
             connections = tuple(self._connections)
 
-        for websocket in connections:
-            try:
-                await websocket.send_json(payload)
-            except Exception:
-                self.disconnect(websocket)
+        await asyncio.gather(
+            *(self._send_one(websocket, payload) for websocket in connections),
+        )
+
+    async def _send_one(self, websocket: Any, payload: dict[str, object]) -> None:
+        try:
+            await asyncio.wait_for(
+                websocket.send_json(payload),
+                timeout=self._send_timeout_seconds,
+            )
+        except Exception:
+            self.disconnect(websocket)
