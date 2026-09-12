@@ -4,6 +4,8 @@ WORKDIR /app
 
 COPY backend/pyproject.toml /app/backend/pyproject.toml
 COPY backend/src /app/backend/src
+COPY shared/schemas /app/shared/schemas
+COPY shared/examples /app/shared/examples
 
 RUN pip install --no-cache-dir /app/backend
 

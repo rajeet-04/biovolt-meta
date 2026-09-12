@@ -51,3 +51,12 @@ docker run --rm -p 8000:8000 \
 
 The service is then available at `http://localhost:8000`; its health check is
 `http://localhost:8000/api/health`.
+
+The image also contains the canonical shared schemas at `/app/shared/schemas`,
+which is the repository root resolved by the backend contract loader. Verify
+that image layout and validate a canonical payload with:
+
+```bash
+docker run --rm biovolt-backend:phase1 python -c \
+  'import json; from pathlib import Path; from biovolt_backend.contracts.loader import validate_payload; payload=json.loads(Path("/app/shared/examples/device-telemetry.example.json").read_text()); validate_payload("device-telemetry.v1.schema.json", payload); print("contract validation: ok")'
+```
