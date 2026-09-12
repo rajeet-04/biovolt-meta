@@ -38,6 +38,7 @@ async def init_database(engine: AsyncEngine) -> None:
         await connection.run_sync(Base.metadata.create_all)
         if connection.dialect.name == "sqlite":
             await connection.run_sync(_migrate_sqlite_telemetry_resistance)
+            await connection.run_sync(_migrate_sqlite_experiment_evidence)
 
 
 def _migrate_sqlite_telemetry_resistance(sync_connection) -> None:
@@ -53,5 +54,16 @@ def _migrate_sqlite_telemetry_resistance(sync_connection) -> None:
             text(
                 "ALTER TABLE telemetry_samples "
                 "ADD COLUMN load_resistance_ohm FLOAT NOT NULL DEFAULT 100000.0"
+            )
+        )
+
+
+def _migrate_sqlite_experiment_evidence(sync_connection) -> None:
+    columns = {column["name"] for column in inspect(sync_connection).get_columns("experiments")}
+    if "evidence_class" not in columns:
+        sync_connection.execute(
+            text(
+                "ALTER TABLE experiments ADD COLUMN evidence_class VARCHAR(20) "
+                "NOT NULL DEFAULT 'measured'"
             )
         )

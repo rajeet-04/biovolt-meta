@@ -3,6 +3,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from biovolt_backend.analytics.repository import AnalyticsRepository
+from biovolt_backend.analytics.service import AnalyticsService
+from biovolt_backend.api.analytics import router as analytics_router
 from biovolt_backend.api.calibration import router as calibration_router
 from biovolt_backend.api.commands import router as commands_router
 from biovolt_backend.api.experiments import router as experiments_router
@@ -47,7 +50,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.telemetry_repository = TelemetryRepository(session_factory)
         app.state.calibration_service = CalibrationService(session_factory)
         app.state.baseline_service = BaselineService(session_factory)
-        app.state.experiment_service = ExperimentService(ExperimentRepository(session_factory))
+        app.state.experiment_service = ExperimentService(
+            ExperimentRepository(session_factory), settings.evidence_class
+        )
+        app.state.analytics_service = AnalyticsService(
+            app.state.experiment_service._repository,
+            AnalyticsRepository(session_factory),
+        )
         app.state.device_registry = DeviceRegistry()
         app.state.command_service = CommandService(CommandRepository(session_factory))
         app.state.command_dispatcher = CommandDispatcher(
@@ -89,6 +98,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health_router)
     app.include_router(operator_router)
     app.include_router(calibration_router)
+    app.include_router(analytics_router)
     app.include_router(experiments_router)
     app.include_router(commands_router)
     app.include_router(status_router)

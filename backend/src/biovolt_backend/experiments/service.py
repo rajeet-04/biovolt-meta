@@ -10,8 +10,9 @@ from .state import ExperimentState, can_transition
 
 
 class ExperimentService:
-    def __init__(self, repository: ExperimentRepository) -> None:
+    def __init__(self, repository: ExperimentRepository, evidence_class: str = "measured") -> None:
         self._repository = repository
+        self._evidence_class = evidence_class
 
     def _view(self, value: Experiment) -> ExperimentView:
         return ExperimentView.model_validate(
@@ -52,6 +53,7 @@ class ExperimentService:
                     }
                     for arm in value.arms
                 ],
+                "evidence_class": value.evidence_class,
             }
         )
 
@@ -86,6 +88,7 @@ class ExperimentService:
             description=request.description,
             created_at=now,
             updated_at=now,
+            evidence_class=self._evidence_class,
             arms=self._arms(request.arms, experiment_id),
         )
         return self._view(await self._repository.save(value))

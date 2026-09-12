@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -17,6 +19,7 @@ class Settings(BaseSettings):
     load_resistance_ohm: float = Field(default=100_000.0, gt=0)
     bpw34_dark_raw: float | None = None
     bpw34_blank_raw: float | None = None
+    evidence_class: Literal["measured", "synthetic_demo"] = "measured"
 
     @field_validator("bpw34_dark_raw", "bpw34_blank_raw", mode="before")
     @classmethod

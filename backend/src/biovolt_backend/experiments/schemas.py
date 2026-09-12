@@ -57,3 +57,4 @@ class ExperimentView(BaseModel):
     description: str | None
     notes: str | None
     arms: list[ExperimentArmView]
+    evidence_class: str = "measured"
