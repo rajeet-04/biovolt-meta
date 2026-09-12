@@ -1,6 +1,6 @@
 """Orchestrate validation, processing, persistence, and telemetry fanout."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from pydantic import ValidationError as PydanticValidationError
@@ -55,6 +55,10 @@ class TelemetryService:
 
         if raw.device_id != authenticated_device_id:
             raise TelemetryRejected("device id mismatch")
+
+        if received_at.tzinfo is None or received_at.utcoffset() is None:
+            raise TelemetryRejected("received_at must be timezone-aware")
+        received_at = received_at.astimezone(UTC)
 
         voltage_mv = raw.electrical.bpv_voltage_mv
         measured_power_uw = (

@@ -182,3 +182,22 @@ async def test_handle_raw_rejects_invalid_schema_before_processing_or_fanout() -
     assert repository.calls == []
     assert hub.payloads == []
     assert registry.calls == []
+
+
+async def test_handle_raw_rejects_naive_receive_timestamp_before_side_effects() -> None:
+    events: list[str] = []
+    service, energy, throttle, repository, hub, registry = service_with_fakes(events)
+
+    with pytest.raises(TelemetryRejected, match="received_at must be timezone-aware"):
+        await service.handle_raw(
+            canonical_payload(),
+            "biovolt-01",
+            datetime(2026, 8, 23, 12, 0),
+        )
+
+    assert events == []
+    assert energy.calls == []
+    assert throttle.calls == []
+    assert repository.calls == []
+    assert hub.payloads == []
+    assert registry.calls == []
