@@ -33,10 +33,11 @@ export function useTelemetryHistory(
   cellId: string | null,
   limit: number,
 ): TelemetryHistoryState {
-  const [state, setState] = useState<Omit<TelemetryHistoryState, 'reload'>>({
+  const [state, setState] = useState<Omit<TelemetryHistoryState, 'reload'> & { sourceKey: string | null }>({
     data: [],
     loading: false,
     error: null,
+    sourceKey: null,
   })
   const [reloadVersion, setReloadVersion] = useState(0)
   const reload = useCallback(() => setReloadVersion((version) => version + 1), [])
@@ -61,10 +62,10 @@ export function useTelemetryHistory(
           { deviceId, cellId, limit: clampLimit(limit) },
           controller.signal,
         )
-        if (active) setState({ data, loading: false, error: null })
+        if (active) setState({ data, loading: false, error: null, sourceKey: `${deviceId}::${cellId}` })
       } catch (error) {
         if (active && !isAbortError(error)) {
-          setState({ data: [], loading: false, error: errorMessage(error) })
+          setState({ data: [], loading: false, error: errorMessage(error), sourceKey: `${deviceId}::${cellId}` })
         }
       }
     }
@@ -76,8 +77,10 @@ export function useTelemetryHistory(
     }
   }, [cellId, deviceId, limit, reloadVersion])
 
-  const visibleState =
-    deviceId === null || cellId === null ? { data: [], loading: false, error: null } : state
+  const requestedSourceKey = deviceId === null || cellId === null ? null : `${deviceId}::${cellId}`
+  const visibleState = requestedSourceKey === null || state.sourceKey !== requestedSourceKey
+    ? { data: [], loading: requestedSourceKey !== null, error: null }
+    : state
 
   return { ...visibleState, reload }
 }

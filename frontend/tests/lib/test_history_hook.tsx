@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTelemetryHistory } from '../../src/hooks/useTelemetryHistory'
 import * as api from '../../src/lib/api'
@@ -65,6 +65,18 @@ describe('useTelemetryHistory', () => {
     expect(signals[1]!.aborted).toBe(false)
     unmount()
     expect(signals[1]!.aborted).toBe(true)
+  })
+
+  it('does not expose the previous source data while the new request is pending', async () => {
+    let resolveSecond: ((value: []) => void) | undefined
+    mockedHistory
+      .mockResolvedValueOnce([{ sequence: 1 } as never])
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve }))
+    const { result, rerender } = renderHook(({ deviceId }: { deviceId: string }) => useTelemetryHistory(deviceId, 'cell-a', 25), { initialProps: { deviceId: 'device-a' } })
+    await waitFor(() => expect(result.current.data).toHaveLength(1))
+    await act(async () => { rerender({ deviceId: 'device-b' }); await Promise.resolve() })
+    expect(result.current.data).toEqual([])
+    await act(async () => { resolveSecond?.([]); await Promise.resolve() })
   })
 
   it('exposes request failures', async () => {
