@@ -17,6 +17,8 @@ from biovolt_backend.persistence.throttle import PersistenceThrottle
 from biovolt_backend.websocket.dashboard_hub import DashboardHub
 from biovolt_backend.websocket.device_registry import DeviceRegistry
 
+STORAGE_SAFE_INT_MAX = 2**63 - 1
+
 
 class TelemetryRejected(ValueError):
     """Raised when an incoming telemetry frame cannot be accepted."""
@@ -45,6 +47,13 @@ def _safe_power_uw(voltage_mv: float, resistance_ohm: float) -> float:
     if not math.isfinite(power):
         raise TelemetryRejected("telemetry calculation overflow")
     return power
+
+
+def _ensure_storage_safe_integers(raw: DeviceTelemetryV1) -> None:
+    """Keep integer telemetry fields within the persistence model's int64 range."""
+
+    if raw.sequence > STORAGE_SAFE_INT_MAX or raw.uptime_ms > STORAGE_SAFE_INT_MAX:
+        raise TelemetryRejected("storage-unsafe telemetry integer")
 
 
 class TelemetryService:
@@ -87,6 +96,7 @@ class TelemetryService:
         if received_at.tzinfo is None or received_at.utcoffset() is None:
             raise TelemetryRejected("received_at must be timezone-aware")
         received_at = received_at.astimezone(UTC)
+        _ensure_storage_safe_integers(raw)
 
         voltage_mv = raw.electrical.bpv_voltage_mv
         measured_power_uw = (

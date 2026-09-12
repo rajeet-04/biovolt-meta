@@ -267,3 +267,31 @@ async def test_handle_raw_rejects_overflowing_power_before_side_effects() -> Non
     assert repository.calls == []
     assert hub.payloads == []
     assert registry.calls == []
+
+
+@pytest.mark.parametrize(
+    ("field", "unsafe_value"),
+    [("uptime_ms", 10**1000), ("sequence", 10**100)],
+)
+async def test_handle_raw_rejects_storage_unsafe_integers_before_side_effects(
+    field: str,
+    unsafe_value: int,
+) -> None:
+    events: list[str] = []
+    service, energy, throttle, repository, hub, registry = service_with_fakes(events)
+    payload = canonical_payload()
+    payload[field] = unsafe_value
+
+    with pytest.raises(TelemetryRejected, match="storage-unsafe telemetry integer"):
+        await service.handle_raw(
+            payload,
+            "biovolt-01",
+            datetime(2026, 8, 23, 12, 0, tzinfo=UTC),
+        )
+
+    assert events == []
+    assert energy.calls == []
+    assert throttle.calls == []
+    assert repository.calls == []
+    assert hub.payloads == []
+    assert registry.calls == []

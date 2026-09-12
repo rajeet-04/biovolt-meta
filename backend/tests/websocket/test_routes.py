@@ -144,6 +144,37 @@ def test_overflowing_device_frame_returns_error_and_connection_continues(tmp_pat
                 assert dashboard.receive_json()["sequence"] == 1245
 
 
+def test_storage_unsafe_integer_frame_returns_error_and_connection_continues(tmp_path) -> None:
+    app = create_app(
+        Settings(
+            environment="test",
+            database_url=f"sqlite+aiosqlite:///{tmp_path / 'routes.db'}",
+            device_shared_token=DEVICE_TOKEN,
+        )
+    )
+    unsafe_frames = []
+    for field, unsafe_value in (("uptime_ms", 10**1000), ("sequence", 10**100)):
+        payload = canonical_payload()
+        payload[field] = unsafe_value
+        unsafe_frames.append(payload)
+
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws/dashboard") as dashboard:
+            with client.websocket_connect(
+                "/ws/device",
+                headers={
+                    "X-BioVolt-Device-ID": DEVICE_ID,
+                    "Authorization": f"Bearer {DEVICE_TOKEN}",
+                },
+            ) as device:
+                for payload in unsafe_frames:
+                    device.send_json(payload)
+                    assert device.receive_json() == {"error": "invalid telemetry frame"}
+
+                device.send_json(canonical_payload())
+                assert dashboard.receive_json()["sequence"] == 1245
+
+
 def test_dashboard_is_read_only_and_ignores_client_commands(tmp_path) -> None:
     app = create_app(
         Settings(
