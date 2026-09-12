@@ -50,3 +50,25 @@ biovolt-simulator --malformed-every 10
 Command-line flags override their corresponding `BIOVOLT_SIM_` environment
 values. The startup summary includes the target, cadence, seed, device, and
 cell, but never prints the device token.
+
+## Docker
+
+Build the image from the repository root:
+
+```bash
+docker build -f simulator/Dockerfile -t biovolt-simulator:phase1 .
+```
+
+The container starts the `biovolt-simulator` command. Configure it entirely
+through `BIOVOLT_SIM_` environment variables; the token is read for the
+authenticated WebSocket connection and is never included in the startup
+summary or logs:
+
+```bash
+docker run --rm \
+  -e BIOVOLT_SIM_BACKEND_WS_URL=ws://host.docker.internal:8000/ws/device \
+  -e BIOVOLT_SIM_DEVICE_ID=biovolt-sim-01 \
+  -e BIOVOLT_SIM_CELL_ID=cell-a \
+  -e BIOVOLT_SIM_DEVICE_TOKEN=replace-with-a-device-token \
+  biovolt-simulator:phase1
+```
