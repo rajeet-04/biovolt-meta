@@ -1,10 +1,10 @@
-# Phase 1 Overview: Backend Core and ESP32 Simulator Implementation Plan
+# Phase 1 Overview: Backend Core and Replaceable ESP32 Simulator Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a fully testable BioVolt backend data pipeline that accepts Phase 0 raw telemetry over an authenticated WebSocket, derives electrical and optical metrics, persists telemetry to SQLite, broadcasts processed telemetry to dashboard clients, and can be exercised without physical hardware using a deterministic ESP32 simulator.
+**Goal:** Build a fully testable BioVolt backend data pipeline that accepts Phase 0 raw telemetry over an authenticated WebSocket, derives electrical and optical metrics, persists telemetry to SQLite, broadcasts processed telemetry to dashboard clients, and can be exercised before hardware is ready using a deterministic simulator that is explicitly replaceable by the real ESP32 without backend changes.
 
-**Architecture:** FastAPI is the Phase 1 runtime boundary. Raw device messages are validated against the Phase 0 contract, converted into typed domain models, processed by pure scientific calculation functions, accumulated into session energy, selectively persisted at 1 Hz, and broadcast at the incoming 2 Hz cadence. A deterministic Python simulator behaves like an ESP32 and uses the exact raw-device contract.
+**Architecture:** FastAPI is device-source neutral. Raw device messages are validated against the Phase 0 contract, converted into typed domain models, processed by pure scientific calculation functions, accumulated into session energy, selectively persisted at approximately 1 Hz, and broadcast at incoming cadence. The deterministic Python simulator and the future ESP32 are peers implementing the same `device-telemetry.v1` protocol and the same authenticated `/ws/device` transport.
 
 **Tech Stack:** Python 3.11+, FastAPI, Uvicorn, Pydantic v2, SQLAlchemy 2.x async ORM, aiosqlite, jsonschema, websockets, pytest, pytest-asyncio, httpx, ruff, Docker Compose.
 
@@ -16,18 +16,22 @@
 
 - Phase 1 must consume Phase 0 schemas without silently changing field meaning.
 - JSON API fields remain `snake_case`.
-- Raw ESP32 telemetry remains measured/control/health data only.
-- FastAPI owns wall-clock timestamping and all scientific derived values.
+- Raw device telemetry remains measured/control/health data only.
+- FastAPI owns wall-clock timestamping and scientific derived values.
 - Current is derived from BPV load voltage and configured precision resistor: `I = V / R`.
 - Power is derived as `P = V^2 / R`.
-- OD680 is derived from BPW34 sample, dark, and blank readings. Missing valid optical calibration must yield `null`, not a fabricated OD value.
-- Biomass and estimated CO2 biofixed remain `null` in Phase 1 unless a valid biomass calibration is explicitly supplied. Full calibration-profile CRUD belongs to a later phase.
-- The backend must accept 500 ms telemetry cadence and broadcast processed telemetry at the same cadence.
-- SQLite persistence is throttled to approximately 1 record/second/device/cell while every incoming frame still updates live state and cumulative energy.
+- OD680 is derived from BPW34 sample, dark, and blank readings. Missing valid optical calibration yields `null`.
+- Biomass and estimated CO2 biofixed remain `null` in Phase 1 unless a valid biomass calibration is explicitly supplied. Full calibration-profile CRUD belongs later.
+- The simulator defaults to a 500 ms telemetry cadence because that matches the planned ESP32 cadence.
+- **The backend must never hard-code a 500 ms interval.** Energy uses actual device `uptime_ms` deltas, and valid jittered/delayed frames must still process correctly.
+- SQLite persistence is throttled to approximately 1 record/second/device/cell while every valid incoming frame updates live state and cumulative energy.
 - Device authentication uses device ID plus shared token. No secrets are committed.
 - Dashboard WebSocket is read-only in Phase 1.
+- The backend must not import, depend on, or branch on simulator code or simulator-specific device IDs.
+- The shared raw telemetry schema must not add `source_type`, `is_simulated`, or equivalent simulator-only metadata.
+- Simulator and real ESP32 use the same `/ws/device` route, authentication headers, and `device-telemetry.v1` payload shape.
 - ESP32 real firmware, React/PWA UI, experiment lifecycle, operator PIN flow, Nginx, Cloudflared, and production deployment remain out of Phase 1.
-- Docker Compose in Phase 1 is a development/integration runner for backend + optional simulator. Production routing is deferred.
+- Docker Compose simulator service is optional test infrastructure and must be stoppable without stopping/rebuilding the backend.
 
 ---
 
@@ -62,7 +66,7 @@ Produces:
 - telemetry table
 - raw payload audit storage
 - per-device/cell energy accumulator
-- 1 Hz persistence throttle
+- approximately 1 Hz persistence throttle
 - latest/history repository queries
 
 ### Module 1.4: Device WebSocket and Dashboard Fanout
@@ -85,28 +89,40 @@ Produces:
 Plan: `docs/superpowers/plans/phase_1/phase_1_5.md`
 
 Produces:
-- 500 ms raw telemetry simulator
-- scientifically coherent synthetic BPV/OD waveforms
+- deterministic 500 ms raw telemetry generator
+- scientifically coherent synthetic BPV/optical waveforms
 - deterministic seed support
 - reconnect behavior
 - sensor-failure/null simulation
 - malformed-packet test mode
 
+The simulator is explicitly **test infrastructure**, not a backend dependency or production data source type.
+
 ### Module 1.6: Integration, Docker Compose, CI, and Acceptance
 Plan: `docs/superpowers/plans/phase_1/phase_1_6.md`
 
 Produces:
-- root Docker Compose backend + simulator profile
+- root Docker Compose backend + optional simulator profile
 - backend and simulator Dockerfiles
 - integration tests across WebSocket -> processing -> SQLite -> dashboard
 - GitHub Actions backend workflow
 - short smoke test
 - 30-minute soak-test script
-- Phase 1 acceptance checklist
+
+### Module 1.7: Simulator-to-Real-Hardware Substitution Gate
+Plan: `docs/superpowers/plans/phase_1/phase_1_7.md`
+
+Produces:
+- backend architecture test forbidding simulator dependencies
+- cadence-independence tests using non-500-ms intervals
+- generic hardware-like WebSocket parity test that imports no simulator code
+- documented simulator-off / ESP32-on switchover procedure
+- smoke test parameterized by arbitrary device ID
+- explicit acceptance proof that real ESP32 replacement requires no FastAPI, database, scientific-calculation, or dashboard-contract rewrite
 
 ---
 
-## Dependency Order
+## Mandatory Dependency Order
 
 ```text
 Phase 0 merged
@@ -124,122 +140,69 @@ Phase 0 merged
 1.4 WebSocket gateway + fanout
     |
     v
-1.5 ESP32 simulator
+1.5 Deterministic simulator
     |
     v
 1.6 Integration + Docker + CI + soak
+    |
+    v
+1.7 Hardware substitution parity gate
+    |
+    v
+Phase 1 complete
 ```
 
-## Planned Repository State After Phase 1
+**Phase 1 is not complete until Module 1.7 passes.**
+
+---
+
+## Runtime Data Flow
+
+During development:
 
 ```text
-backend/
-├── pyproject.toml
-├── Dockerfile
-├── .dockerignore
-├── README.md
-├── src/
-│   └── biovolt_backend/
-│       ├── __init__.py
-│       ├── main.py
-│       ├── config.py
-│       ├── api/
-│       │   ├── __init__.py
-│       │   ├── health.py
-│       │   ├── status.py
-│       │   └── telemetry.py
-│       ├── contracts/
-│       │   ├── __init__.py
-│       │   ├── loader.py
-│       │   └── models.py
-│       ├── domain/
-│       │   ├── __init__.py
-│       │   ├── electrical.py
-│       │   ├── optical.py
-│       │   ├── processing.py
-│       │   └── energy.py
-│       ├── persistence/
-│       │   ├── __init__.py
-│       │   ├── database.py
-│       │   ├── models.py
-│       │   ├── throttle.py
-│       │   └── telemetry_repository.py
-│       ├── services/
-│       │   ├── __init__.py
-│       │   └── telemetry_service.py
-│       └── websocket/
-│           ├── __init__.py
-│           ├── auth.py
-│           ├── device_registry.py
-│           ├── dashboard_hub.py
-│           └── routes.py
-└── tests/
-    ├── conftest.py
-    ├── test_package.py
-    ├── test_config.py
-    ├── test_health.py
-    ├── test_lifespan.py
-    ├── api/
-    ├── contracts/
-    ├── domain/
-    ├── persistence/
-    ├── services/
-    ├── websocket/
-    └── integration/
-
-simulator/
-├── pyproject.toml
-├── Dockerfile
-├── .dockerignore
-├── README.md
-├── src/
-│   └── biovolt_simulator/
-│       ├── __init__.py
-│       ├── __main__.py
-│       ├── config.py
-│       ├── generator.py
-│       ├── faults.py
-│       └── client.py
-└── tests/
-
-docker-compose.yml
-.env.example
-.github/workflows/backend.yml
-scripts/phase1_smoke.py
-scripts/soak_phase1.py
+Deterministic Python simulator
+  device-telemetry.v1 JSON
+          |
+          | same auth + same /ws/device
+          v
+       FastAPI
+          |
+          +--> Phase 0 schema validation
+          +--> scientific processing
+          +--> cumulative energy
+          +--> ~1 Hz SQLite persistence
+          +--> /ws/dashboard live fanout
 ```
 
-## Phase 1 Runtime Data Flow
+Later with hardware:
 
 ```text
-Fake ESP32 simulator
-  raw device-telemetry.v1 JSON
+ESP32 firmware
+  device-telemetry.v1 JSON
           |
+          | same auth + same /ws/device
           v
-/ws/device + device auth
+       FastAPI                 <- unchanged
           |
-          v
-Phase 0 JSON Schema validation
-          |
-          v
-Pydantic DeviceTelemetryV1
-          |
-          v
-TelemetryService
-  - server UTC timestamp
-  - current_ua
-  - power_uw
-  - optional od680
-  - cumulative_energy_mj
-          |
-          +--------------------+
-          |                    |
-          v                    v
-1 Hz SQLite persistence    2 Hz /ws/dashboard
-                               |
-                               v
-                        future React PWA
+          +--> same validation
+          +--> same scientific processing
+          +--> same SQLite
+          +--> same /ws/dashboard
 ```
+
+The simulator replacement operation is intentionally operational:
+
+```text
+1. stop simulator
+2. keep backend running
+3. start/connect ESP32
+4. ESP32 authenticates to /ws/device
+5. ESP32 sends device-telemetry.v1
+6. backend continues unchanged
+```
+
+---
 
 ## Phase 1 Scientific Rules
 
@@ -261,7 +224,7 @@ power_uw = voltage_mv ** 2 / load_resistance_ohm
 delta_energy_mj = ((previous_power_uw + current_power_uw) / 2) * dt_seconds / 1000
 ```
 
-Use trapezoidal integration. Device `uptime_ms` is the primary integration timebase. If uptime decreases, treat it as a device restart and reset the boot-session accumulator.
+Use trapezoidal integration. `dt_seconds` comes from actual device `uptime_ms` differences, not an assumed `0.5` second constant. If uptime decreases, treat it as a device restart and reset the boot-session accumulator.
 
 ### OD680
 
@@ -270,6 +233,8 @@ od680 = -log10((sample - dark) / (blank - dark))
 ```
 
 Return `null` when required optical references are missing or physically invalid. Do not silently clamp invalid optical data into plausible OD values.
+
+---
 
 ## Phase 1 REST/WS Surface
 
@@ -282,9 +247,7 @@ GET /api/telemetry/latest?device_id=...&cell_id=...
 GET /api/telemetry/history?device_id=...&cell_id=...&limit=...
 ```
 
-`/api/health` is the lightweight process/service health check. Database and connected-device health/freshness are reported by `/api/system/status`.
-
-Experiment REST endpoints are intentionally deferred.
+`/api/health` is the lightweight process health check. Database and connected-device health/freshness are reported by `/api/system/status`.
 
 ### WebSocket
 
@@ -293,14 +256,16 @@ Experiment REST endpoints are intentionally deferred.
 /ws/dashboard
 ```
 
-`/ws/device` requires:
+Every device implementation uses:
 
 ```text
-X-BioVolt-Device-ID: biovolt-01
+X-BioVolt-Device-ID: <device-id>
 Authorization: Bearer <shared-token>
 ```
 
-`/ws/dashboard` is read-only in Phase 1.
+There is no simulator-only device endpoint.
+
+---
 
 ## Planned Commit Sequence
 
@@ -310,8 +275,11 @@ Authorization: Bearer <shared-token>
 4. `feat: add authenticated device websocket gateway`
 5. `feat: add deterministic ESP32 simulator`
 6. `test: add Phase 1 integration, Docker, CI and soak checks`
+7. `test: enforce simulator to ESP32 substitution boundary`
 
 Each commit must pass every test introduced up to that commit.
+
+---
 
 ## Phase 1 Exit Criteria
 
@@ -321,23 +289,38 @@ Each commit must pass every test introduced up to that commit.
 - [ ] Canonical raw Phase 0 example is accepted by the backend contract adapter.
 - [ ] Malformed raw telemetry is rejected and is not persisted or broadcast.
 - [ ] Device WebSocket rejects missing/wrong credentials.
-- [ ] Authenticated simulator connects and transmits one frame every 500 ms.
+- [ ] Authenticated simulator connects and normally transmits one frame every 500 ms.
 - [ ] Backend computes current and power with unit-tested formulas.
 - [ ] Backend computes OD680 only when valid optical references are configured.
-- [ ] Cumulative energy uses device uptime and trapezoidal integration.
+- [ ] Cumulative energy uses actual device uptime and trapezoidal integration.
+- [ ] Non-exact 500 ms frame intervals are processed correctly.
+- [ ] Sequence gaps do not require fabricated samples or backend failure.
 - [ ] Device restart resets boot-session energy state instead of integrating across invalid negative time.
-- [ ] Live processed telemetry is broadcast to dashboard clients at incoming cadence.
+- [ ] Live processed telemetry is broadcast at incoming cadence.
 - [ ] SQLite stores approximately 1 sample/second/device/cell rather than every 500 ms frame.
 - [ ] Raw payload is preserved for audit alongside queryable derived columns.
 - [ ] `GET /api/telemetry/latest` returns latest processed data.
 - [ ] `GET /api/telemetry/history` returns bounded chronological data.
 - [ ] Sensor `null` values remain null and do not become fake zeroes.
-- [ ] Simulator can intentionally emit a sensor-null frame and backend handles it.
-- [ ] Simulator can intentionally emit malformed schema data and backend rejects it without breaking unrelated clients.
+- [ ] Simulator can intentionally emit sensor-null and malformed frames for rejection/fault tests.
 - [ ] Backend + simulator start with Docker Compose.
+- [ ] Backend also starts and remains functional with simulator stopped.
+- [ ] Backend source and dependency metadata contain no `biovolt_simulator` dependency.
+- [ ] Backend contains no simulator-device-ID conditional behavior.
+- [ ] A generic hardware-like client that imports no simulator code successfully traverses `/ws/device -> processing -> persistence -> /ws/dashboard`.
+- [ ] Smoke acceptance can target an arbitrary device ID.
+- [ ] Replacing the simulator with the future ESP32 requires no FastAPI route, SQLite schema, scientific-calculation, processed-telemetry, or dashboard-interface change.
 - [ ] Backend unit/integration tests and Phase 0 contract tests pass in GitHub Actions.
 - [ ] A 30-minute simulator soak completes without backend crash and with expected persistence rate.
 
-## Handoff to Phase 2
+## Handoff to Phase 2 and Hardware Phase
 
-Phase 2 builds the React/Vite/TypeScript installable PWA against the stable Phase 1 REST and `/ws/dashboard` interfaces. Phase 2 must not reach directly into SQLite or duplicate FastAPI scientific calculations.
+Phase 2 builds the React/Vite/TypeScript PWA against the stable REST and `/ws/dashboard` interfaces.
+
+The later real ESP32 phase must implement the already-proven device side of the boundary:
+
+```text
+ESP32 -> authenticated /ws/device -> device-telemetry.v1
+```
+
+It must not introduce a separate hardware-only backend protocol. Everything to the right of `/ws/device` stays unchanged.
