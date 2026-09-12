@@ -5,6 +5,7 @@
 #include "config/ConfigStore.h"
 #include "provisioning/SerialProvisioner.h"
 #include "sensors/SensorManager.h"
+#include "actuators/ActuatorController.h"
 
 #if __has_include("BuildSecrets.h")
 #include "BuildSecrets.h"
@@ -24,6 +25,10 @@ ConfigStore configStore;
 RuntimeConfig activeConfig;
 SerialProvisioner provisioner;
 SensorManager sensorManager;
+GrowLightDriver growLight;
+MixerDriver mixer;
+SafetyPolicy safetyPolicy({});
+ActuatorController actuatorController(growLight, mixer, safetyPolicy);
 uint64_t lastSensorSampleMs = 0;
 
 RuntimeConfig buildFallbackConfig() {
@@ -57,6 +62,10 @@ void setup() {
   configStore.begin();
   activeConfig = configStore.load(fallback);
   provisioner.begin(activeConfig, configStore);
+  safetyPolicy.setLimits(SafetyLimits{activeConfig.ledPwmMin, activeConfig.ledPwmMax,
+                                      static_cast<uint32_t>(activeConfig.mixerMaxRuntimeS) * 1000U,
+                                      static_cast<uint32_t>(activeConfig.mixerCooldownS) * 1000U});
+  actuatorController.begin();
   sensorManager.begin();
 
   if (!validateRuntimeConfig(activeConfig).valid) {
@@ -73,6 +82,7 @@ void loop() {
   const uint64_t nowMs = millis();
   if (nowMs - lastSensorSampleMs >= 500) {
     lastSensorSampleMs = nowMs;
+    actuatorController.enforceTimeouts(nowMs);
     sensorManager.sample(nowMs);
   }
   vTaskDelay(pdMS_TO_TICKS(10));
