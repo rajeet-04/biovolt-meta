@@ -5,11 +5,11 @@ services:
       dockerfile: backend/Dockerfile
     env_file:
       - .env
-    ports:
-      - "8000:8000"
+    restart: unless-stopped
     environment:
-      - BIOVOLT_ENVIRONMENT=development
+      - BIOVOLT_ENVIRONMENT=production
       - BIOVOLT_DATABASE_URL=sqlite+aiosqlite:////data/biovolt.db
+      - BIOVOLT_EXPORT_DIR=/data/exports
       - BIOVOLT_DEVICE_SHARED_TOKEN=${BIOVOLT_DEVICE_SHARED_TOKEN:?BIOVOLT_DEVICE_SHARED_TOKEN must be set in .env or the shell}
       - BIOVOLT_LOAD_RESISTANCE_OHM=${BIOVOLT_LOAD_RESISTANCE_OHM:-100000}
     volumes:
@@ -25,6 +25,22 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  nginx:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   simulator:
     profiles:
