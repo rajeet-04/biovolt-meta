@@ -21,6 +21,8 @@ Phase 0 contains no backend runtime code.
 cd backend
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
+cp ../.env.example .env
+# Replace BIOVOLT_DEVICE_SHARED_TOKEN in .env before running the service.
 python -m pip install -e '.[dev]'
 pytest -v
 ruff check .
