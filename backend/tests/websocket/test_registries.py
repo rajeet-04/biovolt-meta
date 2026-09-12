@@ -68,7 +68,11 @@ async def test_dashboard_broadcast_isolates_async_send_failures() -> None:
 
 
 class NeverCompletesWebSocket:
+    def __init__(self) -> None:
+        self.send_calls = 0
+
     async def send_json(self, payload: dict[str, object]) -> None:
+        self.send_calls += 1
         await asyncio.Event().wait()
 
 
@@ -84,3 +88,4 @@ async def test_dashboard_broadcast_is_bounded_for_stalled_client() -> None:
     assert healthy.payloads == [{"sequence": 9}]
     await hub.broadcast_json({"sequence": 10})
     assert healthy.payloads == [{"sequence": 9}, {"sequence": 10}]
+    assert stalled.send_calls == 1
