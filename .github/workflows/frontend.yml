@@ -38,6 +38,9 @@ jobs:
       - run: bun run build
         working-directory: frontend
 
+      - name: Prepare Compose environment
+        run: cp .env.example .env
+
       - run: docker compose config
 
       - run: docker compose build frontend
