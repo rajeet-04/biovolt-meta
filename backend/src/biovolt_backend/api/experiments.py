@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 
 from biovolt_backend.experiments.schemas import ExperimentCreate, ExperimentDraftUpdate
 from biovolt_backend.experiments.service import ExperimentService
+from biovolt_backend.security.dependencies import require_operator_session
 
 router = APIRouter(prefix="/api/experiments")
 
@@ -14,7 +15,7 @@ def orchestrator(request: Request):
     return request.app.state.experiment_orchestrator
 
 
-@router.post("")
+@router.post("", dependencies=[Depends(require_operator_session)])
 async def create(request: Request, body: ExperimentCreate):
     return await service(request).create(body)
 
@@ -29,26 +30,26 @@ async def get(request: Request, experiment_id: str):
     return await service(request).get(experiment_id)
 
 
-@router.patch("/{experiment_id}")
+@router.patch("/{experiment_id}", dependencies=[Depends(require_operator_session)])
 async def update(request: Request, experiment_id: str, body: ExperimentDraftUpdate):
     return await service(request).update_draft(experiment_id, body)
 
 
-@router.post("/{experiment_id}/ready")
+@router.post("/{experiment_id}/ready", dependencies=[Depends(require_operator_session)])
 async def ready(request: Request, experiment_id: str):
     return await service(request).mark_ready(experiment_id)
 
 
-@router.post("/{experiment_id}/start")
+@router.post("/{experiment_id}/start", dependencies=[Depends(require_operator_session)])
 async def start(request: Request, experiment_id: str):
     return await orchestrator(request).start(experiment_id)
 
 
-@router.post("/{experiment_id}/stop")
+@router.post("/{experiment_id}/stop", dependencies=[Depends(require_operator_session)])
 async def stop(request: Request, experiment_id: str):
     return await orchestrator(request).stop(experiment_id)
 
 
-@router.post("/{experiment_id}/abort")
+@router.post("/{experiment_id}/abort", dependencies=[Depends(require_operator_session)])
 async def abort(request: Request, experiment_id: str):
     return await service(request).abort(experiment_id)

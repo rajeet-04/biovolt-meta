@@ -10,6 +10,8 @@ const links = [
   { label: 'Live Data', to: '/live' },
   { label: 'Charts', to: '/charts' },
   { label: 'System', to: '/system' },
+  { label: 'Experiments', to: '/experiments' },
+  { label: 'Control', to: '/control' },
 ]
 
 export function Sidebar({ isOpen, onNavigate }: SidebarProps) {

@@ -1,3 +1,4 @@
+from argon2 import PasswordHasher
 from fastapi.testclient import TestClient
 
 from biovolt_backend.config import Settings
@@ -7,10 +8,13 @@ from biovolt_backend.main import create_app
 def test_create_ready_and_start_does_not_mark_running(tmp_path) -> None:
     app = create_app(
         Settings(
-            environment="test", database_url=f"sqlite+aiosqlite:///{tmp_path / 'experiments.db'}"
+            environment="test",
+            database_url=f"sqlite+aiosqlite:///{tmp_path / 'experiments.db'}",
+            operator_pin_hash=PasswordHasher().hash("2468"),
         )
     )
     with TestClient(app) as client:
+        client.post("/api/operator/login", json={"pin": "2468"})
         created = client.post(
             "/api/experiments",
             json={

@@ -12,6 +12,7 @@ dependencies = [
   "aiosqlite>=0.21,<1",
   "jsonschema>=4.25,<5",
   "rfc3339-validator>=0.1.4,<1",
+  "argon2-cffi>=23.1,<26",
 ]
 
 [project.optional-dependencies]
