@@ -183,3 +183,6 @@ journey, screenshot, security, and traceability evidence is supplied.
 CI also runs a 60-minute-equivalent deterministic simulator smoke with an
 explicit sensor-fault frame; this validates the hardware placeholder path but
 is never treated as physical HIL evidence.
+The simulation-only candidate gate reports `PASS` with
+`hardware_release: false`; the real release-candidate gate remains fail-closed
+until measured evidence is available.
