@@ -15,6 +15,7 @@
 #include "network/DeviceWebSocket.h"
 #include "network/NetworkManager.h"
 #include "telemetry/TelemetryTask.h"
+#include "PAndOOptimizer.h"
 
 #if __has_include("BuildSecrets.h")
 #include "BuildSecrets.h"
@@ -39,12 +40,13 @@ MixerDriver mixer;
 SafetyPolicy safetyPolicy({});
 ActuatorController actuatorController(growLight, mixer, safetyPolicy);
 RuntimeStateStore runtimeState;
+PAndOOptimizer adaptiveOptimizer;
 NetworkManager networkManager;
 DeviceWebSocket deviceWebSocket;
 QueueHandle_t actuatorQueue = nullptr;
 QueueHandle_t commandQueue = nullptr;
 SensorTaskContext sensorTaskContext{&sensorManager, &runtimeState};
-ControlTaskContext controlTaskContext{&runtimeState, nullptr};
+ControlTaskContext controlTaskContext{&runtimeState, nullptr, &adaptiveOptimizer};
 ActuatorTaskContext actuatorTaskContext{&actuatorController, &runtimeState, nullptr};
 CommandTaskContext commandTaskContext{&actuatorController, &runtimeState, &deviceWebSocket, nullptr};
 ProvisioningTaskContext provisioningTaskContext{&provisioner};
