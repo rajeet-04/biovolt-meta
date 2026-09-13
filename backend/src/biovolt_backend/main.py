@@ -50,11 +50,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.telemetry_repository = TelemetryRepository(session_factory)
         app.state.calibration_service = CalibrationService(session_factory)
         app.state.baseline_service = BaselineService(session_factory)
+        experiment_repository = ExperimentRepository(session_factory)
         app.state.experiment_service = ExperimentService(
-            ExperimentRepository(session_factory), settings.evidence_class
+            experiment_repository, settings.evidence_class
         )
         app.state.analytics_service = AnalyticsService(
-            app.state.experiment_service._repository,
+            experiment_repository,
             AnalyticsRepository(session_factory),
         )
         app.state.device_registry = DeviceRegistry()
