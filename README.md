@@ -115,6 +115,12 @@ The backend route, scientific processing, database, and dashboard contract do
 not change. The switchover does not require a simulator install, a simulator
 container in the demo, feature flags, or a second telemetry table.
 
+## Phase 2 PWA acceptance checks
+
+With the PWA preview serving on `http://localhost:4173`, follow the operator
+checklist in [`scripts/phase2_smoke.md`](scripts/phase2_smoke.md) to verify
+live telemetry, simulator removal, and offline/installed-PWA behavior.
+
 ## Phase 1 acceptance checks
 
 With the simulator profile running, execute the short smoke check followed by
