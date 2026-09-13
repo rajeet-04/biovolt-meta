@@ -1,0 +1,45 @@
+name: Firmware
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.12.5"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Create venv with pip
+        run: |
+          uv venv .venv
+          uv pip install --python .venv/bin/python platformio pip
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            firmware/esp32/.pio
+          key: ${{ runner.os }}-pio-${{ hashFiles('firmware/esp32/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-
+
+      - name: Run native C++ tests
+        run: .venv/bin/pio test -e native
+        working-directory: firmware/esp32
+
+      - name: Build ESP32 target
+        run: .venv/bin/pio run -e esp32dev
+        working-directory: firmware/esp32
