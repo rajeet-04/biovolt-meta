@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Run CI-compatible Phase 8 checks; deployment drills remain explicit manual gates."""
+
 import argparse
 import subprocess
-import sys
 
 
 def main() -> int:

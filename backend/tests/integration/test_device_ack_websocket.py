@@ -11,6 +11,18 @@ DEVICE_TOKEN = "test-token-123"
 OPERATOR_HASH = PasswordHasher().hash("2468")
 
 
+def _wait_for_experiment_state(client, experiment_id: str, expected: str) -> dict[str, object]:
+    """Poll the API until the async acknowledgement handler has committed state."""
+
+    latest: dict[str, object] = {}
+    for _ in range(100):
+        latest = client.get(f"/api/experiments/{experiment_id}").json()
+        if latest.get("state") == expected:
+            return latest
+        time.sleep(0.01)
+    return latest
+
+
 def test_acknowledgements_drive_experiment_running_and_reject_mismatched_device(tmp_path) -> None:
     app = create_app(
         Settings(
@@ -163,8 +175,9 @@ def test_required_rejection_aborts_experiment(tmp_path) -> None:
                     "applied_state": None,
                 }
             )
-            time.sleep(0.03)
-            assert client.get(f"/api/experiments/{experiment_id}").json()["state"] == "aborted"
+            assert (
+                _wait_for_experiment_state(client, experiment_id, "aborted")["state"] == "aborted"
+            )
 
 
 def test_safe_stop_ack_completes_running_experiment(tmp_path) -> None:
@@ -248,5 +261,7 @@ def test_safe_stop_ack_completes_running_experiment(tmp_path) -> None:
                     },
                 }
             )
-            time.sleep(0.03)
-            assert client.get(f"/api/experiments/{experiment_id}").json()["state"] == "completed"
+            assert (
+                _wait_for_experiment_state(client, experiment_id, "completed")["state"]
+                == "completed"
+            )

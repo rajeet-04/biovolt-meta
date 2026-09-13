@@ -4,6 +4,7 @@
 This intentionally contains no imports from ``biovolt_backend`` so it can
 detect regressions in the production derivation helpers.
 """
+
 import argparse
 import json
 import math
@@ -39,25 +40,37 @@ def main() -> int:
             print("biomass fit: INELIGIBLE (need three distinct OD values)")
             good = False
         else:
-            slope = sum((x - xbar) * (y - ybar) for x, y in zip(xs, ys)) / sxx
+            slope = sum((x - xbar) * (y - ybar) for x, y in zip(xs, ys, strict=True)) / sxx
             intercept = ybar - slope * xbar
-            residuals = [y - (slope * x + intercept) for x, y in zip(xs, ys)]
+            residuals = [y - (slope * x + intercept) for x, y in zip(xs, ys, strict=True)]
             ss_res = sum(r * r for r in residuals)
             ss_tot = sum((y - ybar) ** 2 for y in ys)
             r2 = None if ss_tot == 0 else 1 - ss_res / ss_tot
             rmse = math.sqrt(ss_res / len(points))
             good &= close("biomass_slope", revision.get("biomass_slope"), slope, args.tolerance)
-            good &= close("biomass_intercept", revision.get("biomass_intercept"), intercept, args.tolerance)
+            good &= close(
+                "biomass_intercept", revision.get("biomass_intercept"), intercept, args.tolerance
+            )
             if r2 is not None:
-                good &= close("biomass_r_squared", revision.get("biomass_r_squared"), r2, args.tolerance)
-            good &= close("biomass_rmse_g_l", revision.get("biomass_rmse_g_l"), rmse, args.tolerance)
+                good &= close(
+                    "biomass_r_squared", revision.get("biomass_r_squared"), r2, args.tolerance
+                )
+            good &= close(
+                "biomass_rmse_g_l", revision.get("biomass_rmse_g_l"), rmse, args.tolerance
+            )
     electrical = revision.get("electrical_sample")
     if electrical:
         voltage = float(electrical["measured_voltage_mv"]) - float(revision["ads1115_offset_mv"])
         resistance = float(revision["load_resistance_ohm"])
-        good &= close("corrected_voltage_mv", electrical.get("corrected_voltage_mv"), voltage, args.tolerance)
-        good &= close("current_ua", electrical.get("current_ua"), voltage * 1000 / resistance, args.tolerance)
-        good &= close("power_uw", electrical.get("power_uw"), voltage * voltage / resistance, args.tolerance)
+        good &= close(
+            "corrected_voltage_mv", electrical.get("corrected_voltage_mv"), voltage, args.tolerance
+        )
+        good &= close(
+            "current_ua", electrical.get("current_ua"), voltage * 1000 / resistance, args.tolerance
+        )
+        good &= close(
+            "power_uw", electrical.get("power_uw"), voltage * voltage / resistance, args.tolerance
+        )
     print("validation: PASS" if good else "validation: FAIL")
     return 0 if good else 1
 
