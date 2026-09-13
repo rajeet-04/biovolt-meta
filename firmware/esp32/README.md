@@ -33,6 +33,11 @@ assigned by the laptop hotspot or local network.
 cp firmware/esp32/include/BuildSecrets.example.h firmware/esp32/include/BuildSecrets.h
 ```
 
+The serial console accepts `config show`, `config set <field> <value>`,
+`config save`, `config discard`, `config reset`, `status`, and `reboot`.
+Passwords and tokens are redacted from output. Saved configuration applies only
+after reboot.
+
 ## Build and test
 
 The firmware is built and tested with [PlatformIO](https://platformio.org/).
