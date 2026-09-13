@@ -18,7 +18,7 @@ export function ChartModeSelector({ mode, onChange }: ChartModeSelectorProps) {
       Data mode
       <select
         aria-label="Chart data mode"
-        className="rounded-md border border-bio-border bg-bio-panel px-2 py-1 text-bio-text"
+        className="border-2 border-bio-border bg-bio-panel px-2 py-1 font-semibold text-bio-text"
         onChange={(event) => onChange(event.target.value as ChartMode)}
         value={mode}
       >

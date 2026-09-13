@@ -34,17 +34,23 @@ hardware.
 
 ## Brand commitments
 
-The product name is BioVolt. No existing visual system was supplied beyond the
-current dark dashboard. The requested direction is professional, calm, direct,
-and explicitly free of generic AI-dashboard decoration.
+The product name is BioVolt. The visual direction is a light, high-authority
+instrument board: paper/white surfaces, ink-black structure, hard edges, and
+bright signal colors that make the system feel consequential without hiding
+what each value means. The dashboard may be visually intimidating through
+density, scale, and disciplined contrast, but it must never use fake claims,
+ambiguous decoration, or obscured provenance to manufacture confidence.
 
 ## Design principles
 
 1. Show provenance and freshness before interpretation.
 2. Give the operator a stable orientation and a clear next action.
 3. Treat measurements as evidence, not decoration.
-4. Use hierarchy and whitespace instead of a wall of identical cards.
-5. Keep guarded actions visible without making them feel casually available.
+4. Use a minimal-maximal rhythm: quiet paper space around a few oversized
+   decisions, then dense charts and measurement detail where the data earns it.
+5. Use hard-edged brutalist materials and color as a navigational language, not
+   as a substitute for labels, units, or state text.
+6. Keep guarded actions visible without making them feel casually available.
 
 ## Accessibility and inclusion
 

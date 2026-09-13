@@ -33,11 +33,11 @@ function OverviewIntro() {
           A live view of backend-processed telemetry, device state, and source freshness.
         </p>
       </div>
-      <div className="flex items-center gap-3 self-start rounded-lg border border-bio-border bg-bio-panel px-3 py-2.5 lg:self-end">
-        <span aria-hidden="true" className="h-2 w-2 rounded-full bg-bio-success" />
+      <div className="accent-panel flex items-center gap-3 self-start px-3 py-2.5 lg:self-end">
+        <span aria-hidden="true" className="h-2 w-2 bg-white" />
         <div>
-          <p className="text-xs font-semibold text-bio-text">Operator view</p>
-          <p className="text-xs text-bio-muted">Source-neutral telemetry</p>
+          <p className="text-xs font-black text-white">Operator view</p>
+          <p className="text-xs text-white/80">Source-neutral telemetry</p>
         </div>
       </div>
     </header>
@@ -55,10 +55,10 @@ export function OverviewPage() {
       <div className="overview-page mx-auto max-w-[1280px]">
         <OverviewIntro />
         <TelemetryHeader frame={null} wsState={wsState} />
-        <section className="surface mt-8 border-dashed bg-bio-panel/70 p-8 text-center md:p-12">
+        <section className="surface mt-8 border-dashed bg-bio-panel p-8 text-center md:p-12">
           <div className="mx-auto flex max-w-lg flex-col items-center">
-            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-bio-warning" />
-            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.14em] text-bio-muted">Awaiting stream</p>
+            <span aria-hidden="true" className="h-2 w-2 bg-bio-warning" />
+            <p className="mt-4 text-xs font-black uppercase tracking-[0.14em] text-bio-muted">Awaiting stream</p>
             <h2 className="mt-2 text-xl font-semibold text-bio-text">Waiting for BioVolt telemetry</h2>
             <p className="mt-2 text-sm leading-6 text-bio-muted">Connect a device to view backend-processed measurements.</p>
           </div>
@@ -74,12 +74,12 @@ export function OverviewPage() {
 
       <section className="mt-8 grid items-start gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.75fr)]">
         <article className="surface overflow-hidden">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-bio-border px-5 py-4">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b-2 border-bio-border bg-bio-accent px-5 py-4 text-white">
             <div>
-              <h2 className="text-base font-semibold text-bio-text">Electrical output</h2>
-              <p className="mt-1 text-sm text-bio-muted">Backend-derived measurements from the latest frame.</p>
+              <h2 className="text-base font-black text-white">Electrical output</h2>
+              <p className="mt-1 text-sm text-white/80">Backend-derived measurements from the latest frame.</p>
             </div>
-            <span className="rounded-full border border-bio-border px-2.5 py-1 text-xs text-bio-muted">Frame {frame.sequence}</span>
+            <span className="brutal-tag border-white/70 text-white">Frame {frame.sequence}</span>
           </div>
           <dl className="grid divide-y divide-bio-border/70 px-5 sm:grid-cols-2 sm:divide-x sm:divide-y-0 sm:px-0 xl:grid-cols-4">
             <Measurement label="BPV Voltage" value={frame.electrical.voltage_mv} digits={1} unit="mV" />
@@ -90,9 +90,12 @@ export function OverviewPage() {
         </article>
 
         <article className="surface p-5">
-          <div>
-            <h2 className="text-base font-semibold text-bio-text">Operating state</h2>
-            <p className="mt-1 text-sm text-bio-muted">Actuation and control state carried by the frame.</p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-black text-bio-text">Operating state</h2>
+              <p className="mt-1 text-sm text-bio-muted">Actuation and control state carried by the frame.</p>
+            </div>
+            <span className="brutal-tag text-bio-info">State</span>
           </div>
           <dl className="mt-5 divide-y divide-bio-border/70 border-y border-bio-border/70">
             <div className="flex items-baseline justify-between gap-4 py-3">
@@ -114,7 +117,7 @@ export function OverviewPage() {
                 <p className="text-sm font-medium text-bio-text">OD680</p>
                 <p className="mt-1 text-xs text-bio-muted">Optical reading</p>
               </div>
-              <span className="rounded-full border border-bio-warning/40 bg-bio-warning/10 px-2 py-1 text-[0.68rem] font-semibold text-bio-warning">Calibration gated</span>
+              <span className="brutal-tag text-bio-warning">Calibration gated</span>
             </div>
             <p className="data-value mt-2 text-lg font-semibold text-bio-text">
               {formatNullableNumber(frame.biological.od680, 2) === 'Unavailable' ? 'Unavailable' : `${formatNullableNumber(frame.biological.od680, 2)} unitless`}
@@ -127,7 +130,8 @@ export function OverviewPage() {
       <section className="mt-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-bio-text">Environment</h2>
+            <p className="page-kicker text-bio-info">Context / ambient</p>
+            <h2 className="mt-1 text-base font-black text-bio-text">Environment</h2>
             <p className="mt-1 text-sm text-bio-muted">Ambient context carried alongside the electrical frame.</p>
           </div>
         </div>

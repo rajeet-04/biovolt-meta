@@ -20,10 +20,10 @@ export function ConnectionBadge({ state }: ConnectionBadgeProps) {
   return (
     <span
       aria-live="polite"
-      className={`inline-flex items-center gap-2 rounded-full border border-bio-border px-2.5 py-1 text-xs font-medium ${tones[state].text}`}
+      className={`brutal-tag ${tones[state].text}`}
       role="status"
     >
-      <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${tones[state].dot}`} />
+      <span aria-hidden="true" className={`h-2 w-2 ${tones[state].dot}`} />
       {labels[state]}
     </span>
   )

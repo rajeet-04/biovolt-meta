@@ -66,7 +66,8 @@ export function ChartsPage() {
     <div className="mx-auto max-w-6xl">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-bio-text">Charts</h1>
+          <p className="page-kicker">Monitor / Signal board</p>
+          <h1 className="page-title mt-2">Charts</h1>
           <p className="mt-2 text-sm text-bio-muted">Source: <SourceSelector /></p>
           <p className="mt-1 text-sm text-bio-muted">Data mode: {modeLabels[mode]}</p>
         </div>
@@ -74,7 +75,7 @@ export function ChartsPage() {
       </div>
 
       {!source ? (
-        <section className="mt-8 rounded-xl border border-dashed border-bio-border bg-bio-panel p-8 text-center">
+        <section className="surface mt-8 border-dashed bg-bio-panel p-8 text-center">
           <h2 className="text-xl font-semibold text-bio-text">Waiting for BioVolt telemetry</h2>
           <p className="mt-2 text-bio-muted">Connect a device to plot backend-processed measurements.</p>
         </section>
@@ -82,7 +83,7 @@ export function ChartsPage() {
         <>
           {mode === 'history' && history.loading ? <p className="mt-6 text-sm text-bio-muted">Loading stored telemetry…</p> : null}
           {mode === 'history' && history.error ? <p className="mt-6 text-sm text-bio-danger" role="alert">{history.error}</p> : null}
-          <section className="mt-6 grid gap-4 md:grid-cols-2">
+          <section className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {chartMetrics.map((metric) => {
               const metadata = chartMetadata[metric]
               const points = pointsForMetric(frames, metric)
@@ -95,6 +96,8 @@ export function ChartsPage() {
                   points={points}
                   title={metadata.label}
                   unit={metadata.unit}
+                  live={mode !== 'history'}
+                  featured={metric === 'power_uw'}
                 />
               )
             })}

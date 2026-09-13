@@ -16,6 +16,7 @@ export default {
           success: 'rgb(var(--success) / <alpha-value>)',
           warning: 'rgb(var(--warning) / <alpha-value>)',
           danger: 'rgb(var(--danger) / <alpha-value>)',
+          info: 'rgb(var(--info) / <alpha-value>)',
           border: 'rgb(var(--border) / <alpha-value>)',
           focus: 'rgb(var(--focus) / <alpha-value>)',
         },

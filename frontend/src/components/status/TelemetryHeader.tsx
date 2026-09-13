@@ -14,10 +14,10 @@ interface TelemetryHeaderProps {
 
 export function TelemetryHeader({ frame, wsState, nowMs }: TelemetryHeaderProps) {
   return (
-    <section aria-label="Telemetry status" className="surface mt-6 bg-bio-panel/80 px-4 py-3 md:px-5">
+    <section aria-label="Telemetry status" className="surface mt-6 bg-bio-panel px-4 py-3 md:px-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-bio-muted">Selected source</p>
+          <p className="text-[0.68rem] font-black uppercase tracking-[0.14em] text-bio-muted">Selected source</p>
           <p className="mt-1 text-sm font-medium text-bio-text">
             <SourceSelector />
           </p>

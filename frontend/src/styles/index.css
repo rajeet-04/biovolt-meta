@@ -2,20 +2,21 @@
 @config '../../tailwind.config.ts';
 
 :root {
-  color-scheme: dark;
-  --bg: 13 17 16;
-  --panel: 21 27 25;
-  --panel-strong: 28 36 33;
-  --panel-raised: 36 45 41;
-  --text: 236 242 238;
-  --muted: 161 175 166;
-  --accent: 219 178 92;
-  --accent-soft: 66 53 26;
-  --success: 116 211 159;
-  --warning: 235 171 78;
-  --danger: 235 103 103;
-  --border: 48 61 56;
-  --focus: 241 197 111;
+  color-scheme: light;
+  --bg: 246 247 243;
+  --panel: 255 255 252;
+  --panel-strong: 233 236 229;
+  --panel-raised: 214 220 211;
+  --text: 16 23 24;
+  --muted: 67 78 80;
+  --accent: 21 75 255;
+  --accent-soft: 222 230 255;
+  --success: 0 111 78;
+  --warning: 161 87 0;
+  --danger: 176 34 50;
+  --info: 109 40 217;
+  --border: 16 23 24;
+  --focus: 21 75 255;
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -93,14 +94,54 @@ samp {
 }
 
 .surface {
-  border: 1px solid rgb(var(--border));
-  border-radius: 12px;
+  border: 2px solid rgb(var(--border));
+  border-radius: 0;
   background: rgb(var(--panel));
+  box-shadow: 5px 5px 0 rgb(var(--border)), 0 8px 16px rgb(var(--border) / 0.08);
 }
 
 .data-value {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+}
+
+.brutal-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 2px solid currentColor;
+  border-radius: 0;
+  padding: 0.28rem 0.5rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.accent-panel {
+  border: 2px solid rgb(var(--border));
+  background: rgb(var(--accent));
+  box-shadow: 5px 5px 0 rgb(var(--border)), 0 8px 16px rgb(var(--border) / 0.08);
+}
+
+.chart-panel {
+  border: 2px solid rgb(var(--border));
+  border-radius: 0;
+  background: rgb(var(--panel));
+  box-shadow: 4px 4px 0 rgb(var(--border)), 0 7px 14px rgb(var(--border) / 0.07);
+  padding: 1rem;
+}
+
+.chart-panel h2,
+.surface h2,
+.surface h3 {
+  letter-spacing: -0.025em;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .overview-page {
