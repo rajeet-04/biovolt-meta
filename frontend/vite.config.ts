@@ -29,7 +29,7 @@ export const pwaOptions = {
   workbox: {
     globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
     navigateFallbackDenylist: [/^\/api\//],
-    runtimeCaching: [],
+    runtimeCaching: [{ urlPattern: ({ url }) => url.pathname.startsWith('/assets/'), handler: 'CacheFirst', options: { cacheName: 'biovolt-static-assets' } }],
   },
 } satisfies Partial<VitePWAOptions>
 
