@@ -40,4 +40,3 @@ def test_reset_forgets_one_source() -> None:
     tracker.reset("d1", "c1")
 
     assert not tracker.observe("d1", "c1", 100, 5000).contiguous
-
