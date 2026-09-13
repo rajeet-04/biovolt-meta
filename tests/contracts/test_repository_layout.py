@@ -37,11 +37,11 @@ REQUIRED_FILES += [
 FORBIDDEN_PHASE_ZERO_FILES = [
     # Docker Compose was introduced by Phase 1.6 and removed from this list at
     # that time. The frontend package manifest was introduced by Phase 2.1 and
-    # removed from this list as part of Phase 2.7 verification. Firmware
-    # PlatformIO and a top-level backend main module remain forbidden until
-    # their owning phases (3.x and 1.x respectively) land.
+    # removed from this list as part of Phase 2.7 verification. The ESP32
+    # PlatformIO project was introduced by Phase 3.1 and removed from this
+    # list as part of Phase 3.1 verification. A top-level backend main
+    # module remains forbidden until its owning phase lands.
     "backend/app/main.py",
-    "firmware/esp32/platformio.ini",
 ]
 
 
