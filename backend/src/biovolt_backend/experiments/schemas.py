@@ -5,6 +5,19 @@ from pydantic import BaseModel, Field
 from .state import ExperimentState
 
 
+class AdaptiveConfig(BaseModel):
+    initial_pwm: int = Field(default=64, ge=0, le=255)
+    pwm_min: int = Field(default=0, ge=0, le=255)
+    pwm_max: int = Field(default=255, ge=0, le=255)
+    pwm_step: int = Field(default=4, ge=1, le=32)
+    settle_ms: int = Field(default=3000, ge=500)
+    minimum_valid_samples: int = Field(default=3, ge=1, le=9)
+    objective_deadband_fraction: float = Field(default=0.01, ge=0, le=0.25)
+    mixer_policy: str = Field(default="off", pattern="^(off|periodic)$")
+    mixer_period_ms: int | None = Field(default=None, ge=1)
+    mixer_on_ms: int | None = Field(default=None, ge=1)
+
+
 class ExperimentArmInput(BaseModel):
     device_id: str = Field(min_length=1, max_length=64)
     cell_id: str = Field(min_length=1, max_length=64)
@@ -13,6 +26,7 @@ class ExperimentArmInput(BaseModel):
     initial_mixer_on: bool = False
     label: str | None = Field(default=None, max_length=128)
     calibration_revision_id: str | None = None
+    adaptive: AdaptiveConfig | None = None
 
 
 class ExperimentCreate(BaseModel):
