@@ -15,3 +15,5 @@ Responsibilities beginning in the firmware phase:
 Scientific derived values remain backend-owned.
 
 Phase 0 contains no firmware runtime code.
+
+Phase 3.1: PlatformIO project bootstrapped. See Task 4 for build commands.
