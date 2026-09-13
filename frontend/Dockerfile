@@ -1,9 +1,9 @@
-FROM node:22-alpine
+FROM oven/bun:1.4.0-alpine
 WORKDIR /app
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+COPY frontend/package.json frontend/bun.lock ./
+RUN bun install --frozen-lockfile
 COPY frontend/ ./
-RUN npm run build
+RUN bun run build
 ENV BIOVOLT_PROXY_TARGET=http://backend:8000
 EXPOSE 4173
-CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "4173"]
+CMD ["bun", "run", "preview", "--", "--host", "0.0.0.0", "--port", "4173"]

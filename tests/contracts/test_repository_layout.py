@@ -6,6 +6,8 @@ REQUIRED_FILES = [
     "README.md",
     ".gitignore",
     ".editorconfig",
+    "pyproject.toml",
+    "uv.lock",
     "backend/README.md",
     "firmware/esp32/README.md",
     "frontend/README.md",
@@ -16,7 +18,6 @@ REQUIRED_FILES = [
 ]
 
 REQUIRED_FILES += [
-    "requirements-contracts.txt",
     "scripts/validate_schemas.py",
     ".github/workflows/contracts.yml",
     "shared/schemas/device-telemetry.v1.schema.json",
