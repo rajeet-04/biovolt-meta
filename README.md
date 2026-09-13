@@ -1,5 +1,13 @@
 # BioVolt
 
+## Phase 3 acceptance status
+
+Firmware, backend, simulator, contracts, and PWA are CI-verified with the
+ESP32 simulated-sensor placeholder. The real driver path and HIL acceptance
+remain intentionally documented rather than claimed: complete the wiring,
+bench, parity, smoke, and soak records under `docs/hardware/` and `scripts/`
+before energizing hardware loads or declaring physical-device acceptance.
+
 BioVolt is an adaptive living biophotovoltaic research prototype for MetaMorph 2.0.
 
 ## Architecture
