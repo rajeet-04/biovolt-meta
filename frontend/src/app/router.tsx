@@ -9,6 +9,7 @@ import { ExperimentDetailPage } from '../pages/ExperimentDetailPage'
 import { ControlPage } from '../pages/ControlPage'
 import { CalibrationPage } from '../pages/CalibrationPage'
 import { CalibrationWizardPage } from '../pages/CalibrationWizardPage'
+import { ExperimentResultsPage } from '../pages/ExperimentResultsPage'
 
 export const appRoutes: RouteObject[] = [
   {
@@ -20,6 +21,7 @@ export const appRoutes: RouteObject[] = [
       { path: 'system', element: <SystemPage /> },
       { path: 'experiments', element: <ExperimentsPage /> },
       { path: 'experiments/:experimentId', element: <ExperimentDetailPage /> },
+      { path: 'experiments/:experimentId/results', element: <ExperimentResultsPage /> },
       { path: 'control', element: <ControlPage /> },
       { path: 'calibration', element: <CalibrationPage /> },
       { path: 'calibration/new', element: <CalibrationWizardPage /> },

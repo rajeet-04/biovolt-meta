@@ -1,0 +1,1 @@
+export function ExportExperimentButton({ experimentId }: { experimentId: string }) { return <a className="inline-block rounded bg-bio-panel-strong px-3 py-2 text-sm text-bio-text" download href={`/api/experiments/${encodeURIComponent(experimentId)}/analytics/export.csv`}>Export analytics CSV</a> }

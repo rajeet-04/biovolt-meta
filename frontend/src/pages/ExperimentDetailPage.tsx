@@ -32,6 +32,7 @@ export function ExperimentDetailPage() {
     <div className="mx-auto grid max-w-4xl gap-6">
       <div className="flex items-center justify-between"><div><Link className="text-sm text-bio-accent" to="/experiments">← Experiments</Link><h1 className="mt-2 text-3xl font-semibold text-bio-text">{experiment.name}</h1></div><ExperimentStateBadge state={experiment.state} /></div>
       <p className="text-bio-muted">{experiment.description ?? 'No description provided.'}</p>
+      {experiment.state === 'completed' ? <Link className="text-bio-accent" to={`/experiments/${experiment.id}/results`}>View results</Link> : null}
       <section className="grid gap-3 rounded-lg border border-bio-border bg-bio-panel p-5"><h2 className="text-lg font-semibold text-bio-text">Start intent</h2><p className="text-sm text-bio-muted">Review device freshness, arm mode, and exact setpoints before starting.</p>{experiment.arms.map((arm) => <div className="rounded border border-bio-border p-3 text-sm text-bio-text" key={arm.id ?? `${arm.device_id}-${arm.cell_id}`}><p>{arm.device_id} / {arm.cell_id}</p><p>Mode: {arm.mode} · LED PWM: {arm.initial_led_pwm} · Mixer: {arm.initial_mixer_on ? 'On' : 'Off'}</p><p className="text-bio-muted">Device freshness is confirmed by the live status view.</p></div>)}</section>
       {error ? <p className="text-sm text-red-300" role="alert">{error}</p> : null}
       {unavailableReason ? <p className="text-sm text-bio-muted" role="status">{unavailableReason}</p> : null}

@@ -18,3 +18,23 @@ class EnergyComparisonView(BaseModel):
     gain_pct: float | None
     common_duration_s: float | None
     reasons: tuple[str, ...]
+    passive_coverage_fraction: float | None = None
+    adaptive_coverage_fraction: float | None = None
+    passive_sample_count: int = 0
+    adaptive_sample_count: int = 0
+
+
+class AnalyticsSeriesPoint(BaseModel):
+    elapsed_s: float
+    passive_power_uw: float | None = None
+    adaptive_power_uw: float | None = None
+    passive_led_pwm: float | None = None
+    adaptive_led_pwm: float | None = None
+    passive_mixer_on: bool | None = None
+    adaptive_mixer_on: bool | None = None
+
+
+class AnalyticsSeriesView(BaseModel):
+    experiment_id: str
+    bucket_seconds: int
+    points: tuple[AnalyticsSeriesPoint, ...]
