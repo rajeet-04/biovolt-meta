@@ -9,7 +9,10 @@ void actuatorTaskEntry(void* context) {
   for (;;) {
     const uint64_t nowMs = esp_timer_get_time() / 1000ULL;
     if (ctx && ctx->actuatorQueue && xQueueReceive(ctx->actuatorQueue, &request, pdMS_TO_TICKS(100)) == pdTRUE) {
-      if (ctx->controller) ctx->controller->apply(request, nowMs);
+      const RuntimeSnapshot snapshot = ctx->state ? ctx->state->snapshot() : RuntimeSnapshot{};
+      if (ctx->controller && snapshot.control.mode == ControlMode::Monitor) {
+        ctx->controller->apply(request, nowMs);
+      }
     }
     if (ctx && ctx->controller) {
       const ActuatorState applied = ctx->controller->enforceTimeouts(nowMs);
