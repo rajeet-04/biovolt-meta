@@ -1,5 +1,6 @@
 """In-memory registry of authenticated device WebSocket connections."""
 
+import asyncio
 from datetime import datetime
 from threading import RLock
 from typing import Any
@@ -15,6 +16,7 @@ class DeviceRegistry:
 
     def __init__(self) -> None:
         self._connections: dict[str, Any] = {}
+        self._send_locks: dict[str, asyncio.Lock] = {}
         self._latest_telemetry: dict[str, datetime] = {}
         self._lock = RLock()
 
@@ -23,6 +25,7 @@ class DeviceRegistry:
 
         with self._lock:
             self._connections[device_id] = websocket
+            self._send_locks[device_id] = asyncio.Lock()
 
     def disconnect(self, device_id: str, websocket: Any) -> None:
         """Remove a socket only when it is still the active device socket."""
@@ -30,6 +33,23 @@ class DeviceRegistry:
         with self._lock:
             if self._connections.get(device_id) is websocket:
                 del self._connections[device_id]
+                self._send_locks.pop(device_id, None)
+
+    async def send_json(self, device_id: str, payload: dict[str, object]) -> bool:
+        """Send one payload if the device is connected, without blocking reconnects."""
+
+        with self._lock:
+            websocket = self._connections.get(device_id)
+            lock = self._send_locks.get(device_id)
+        if websocket is None or lock is None:
+            return False
+        try:
+            async with lock:
+                await websocket.send_json(payload)
+        except Exception:
+            self.disconnect(device_id, websocket)
+            return False
+        return True
 
     def connected_device_ids(self) -> list[str]:
         """Return a stable snapshot of currently connected device IDs."""

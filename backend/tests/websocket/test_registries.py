@@ -16,6 +16,19 @@ class FakeWebSocket:
         self.payloads.append(payload)
 
 
+async def test_device_registry_sends_to_connected_socket() -> None:
+    registry = DeviceRegistry()
+    socket = FakeWebSocket()
+    registry.connect("biovolt-01", socket)
+
+    assert await registry.send_json("biovolt-01", {"command": "safe_stop"}) is True
+    assert socket.payloads == [{"command": "safe_stop"}]
+
+
+async def test_device_registry_returns_false_when_disconnected() -> None:
+    assert await DeviceRegistry().send_json("missing", {"command": "safe_stop"}) is False
+
+
 def test_device_registry_reconnect_and_matching_disconnect() -> None:
     registry = DeviceRegistry()
     old_socket = FakeWebSocket()
