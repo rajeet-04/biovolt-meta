@@ -1,0 +1,1 @@
+export function EligibilityNotice({ eligible, reason }: { eligible: boolean; reason?: string }) { return <p className="text-sm text-bio-muted" role="status">{eligible ? 'Eligible comparison' : `Unavailable${reason ? ` — ${reason}` : ''}`}</p> }

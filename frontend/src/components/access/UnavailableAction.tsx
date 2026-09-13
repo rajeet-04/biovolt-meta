@@ -1,0 +1,1 @@
+export function UnavailableAction({ label, reason }: { label: string; reason: string }) { return <p className="rounded border border-bio-border p-3 text-sm text-bio-muted" role="status">{label}: Unavailable — {reason}</p> }

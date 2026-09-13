@@ -8,6 +8,7 @@ import { isTelemetryStale } from '../lib/stale'
 import { useOperatorStore } from '../stores/operatorStore'
 import { useTelemetryStore } from '../stores/telemetryStore'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
+import { CapabilityGate } from '../components/access/CapabilityGate'
 
 export function ControlPage() {
   const { authenticated } = useOperatorStore()
@@ -41,5 +42,5 @@ export function ControlPage() {
     try { setCommand(await sendControlCommand({ device_id: deviceId, kind, payload })) } catch { setCommand({ command_id: '', device_id: deviceId, status: 'failed', kind, reason_code: 'internal_error', message: 'Unable to send command', applied_state: null }) }
   }
   const confirmedPwm = useMemo(() => latest?.actuators.grow_led_pwm ?? 0, [latest])
-  return <div className="mx-auto grid max-w-4xl gap-6"><div><h1 className="text-3xl font-semibold text-bio-text">Manual control</h1><p className="mt-2 text-bio-muted">Desired values never become confirmed until the device acknowledges application.</p></div>{disabledReason ? <p className="rounded border border-bio-border p-3 text-sm text-bio-muted" role="status">{disabledReason}</p> : null}<p className="text-sm text-bio-muted">Confirmed LED PWM: {confirmedPwm}</p><LedPwmControl disabled={disabled} onApply={() => void send('set_led_pwm', { pwm: desiredPwm })} onChange={setDesiredPwm} value={desiredPwm} /><MixerControl disabled={disabled} on={latest?.actuators.mixer_on ?? false} onApply={(on) => void send('set_mixer', { on })} /><button className="w-fit rounded border border-red-400 px-4 py-2 text-sm font-semibold text-red-300" disabled={disabled} onClick={() => void send('safe_stop', {})} type="button">Safe Stop</button><CommandStatus command={command} /><OperatorLoginDialog onClose={() => setLoginOpen(false)} open={loginOpen} /></div>
+  return <CapabilityGate capability="can_control"><div className="mx-auto grid max-w-4xl gap-6"><div><h1 className="text-3xl font-semibold text-bio-text">Manual control</h1><p className="mt-2 text-bio-muted">Desired values never become confirmed until the device acknowledges application.</p></div>{disabledReason ? <p className="rounded border border-bio-border p-3 text-sm text-bio-muted" role="status">{disabledReason}</p> : null}<p className="text-sm text-bio-muted">Confirmed LED PWM: {confirmedPwm}</p><LedPwmControl disabled={disabled} onApply={() => void send('set_led_pwm', { pwm: desiredPwm })} onChange={setDesiredPwm} value={desiredPwm} /><MixerControl disabled={disabled} on={latest?.actuators.mixer_on ?? false} onApply={(on) => void send('set_mixer', { on })} /><button className="w-fit rounded border border-red-400 px-4 py-2 text-sm font-semibold text-red-300" disabled={disabled} onClick={() => void send('safe_stop', {})} type="button">Safe Stop</button><CommandStatus command={command} /><OperatorLoginDialog onClose={() => setLoginOpen(false)} open={loginOpen} /></div></CapabilityGate>
 }
