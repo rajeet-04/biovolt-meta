@@ -1,4 +1,5 @@
 """Deterministic synthetic Adaptive controller used only by simulator tests."""
+
 from dataclasses import dataclass
 from statistics import median
 
@@ -12,7 +13,9 @@ class AdaptiveConfig:
     deadband: float = 0.01
 
     def validate(self) -> None:
-        if not self.pwm_min < self.pwm_max or not self.pwm_min <= self.initial_pwm <= self.pwm_max:
+        if not self.pwm_min < self.pwm_max or not (
+            self.pwm_min <= self.initial_pwm <= self.pwm_max
+        ):
             raise ValueError("invalid PWM bounds")
         if not 0 < self.pwm_step <= min(32, self.pwm_max - self.pwm_min):
             raise ValueError("invalid PWM step")
@@ -23,7 +26,8 @@ class AdaptiveConfig:
 class SyntheticAdaptive:
     """Small deterministic synthetic P&O model; output is never biological evidence."""
 
-    def __init__(self, config: AdaptiveConfig = AdaptiveConfig()) -> None:
+    def __init__(self, config: AdaptiveConfig | None = None) -> None:
+        config = config or AdaptiveConfig()
         config.validate()
         self.config = config
         self.pwm = config.initial_pwm
