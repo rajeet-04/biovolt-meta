@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 from .state import ExperimentState
@@ -10,6 +12,7 @@ class ExperimentArmInput(BaseModel):
     initial_led_pwm: int = Field(ge=0, le=255)
     initial_mixer_on: bool = False
     label: str | None = Field(default=None, max_length=128)
+    calibration_revision_id: str | None = None
 
 
 class ExperimentCreate(BaseModel):
@@ -27,6 +30,10 @@ class ExperimentDraftUpdate(BaseModel):
 
 class ExperimentArmView(ExperimentArmInput):
     id: str
+    baseline_sequence: int | None = None
+    baseline_timestamp: datetime | None = None
+    baseline_biomass_g_l: float | None = None
+    baseline_dry_biomass_g: float | None = None
 
 
 class ExperimentView(BaseModel):

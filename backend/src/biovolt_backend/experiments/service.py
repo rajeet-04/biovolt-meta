@@ -30,6 +30,11 @@ class ExperimentService:
                         "initial_led_pwm": arm.initial_led_pwm,
                         "initial_mixer_on": arm.initial_mixer_on,
                         "label": arm.label,
+                        "calibration_revision_id": arm.calibration_revision_id,
+                        "baseline_sequence": arm.baseline_sequence,
+                        "baseline_timestamp": arm.baseline_timestamp,
+                        "baseline_biomass_g_l": arm.baseline_biomass_g_l,
+                        "baseline_dry_biomass_g": arm.baseline_dry_biomass_g,
                     }
                     for arm in value.arms
                 ],
