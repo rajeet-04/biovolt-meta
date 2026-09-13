@@ -57,6 +57,15 @@ void test_control_state_defaults_monitor_zero() {
   TEST_ASSERT_EQUAL_INT8(0, c.optimizerDirection);
 }
 
+void test_runtime_snapshot_defaults_safe() {
+  RuntimeSnapshot snapshot;
+  TEST_ASSERT_FALSE(snapshot.sensors.health.ads1115Ok);
+  TEST_ASSERT_EQUAL_UINT8(0, snapshot.actuators.growLedPwm);
+  TEST_ASSERT_FALSE(snapshot.actuators.mixerOn);
+  TEST_ASSERT_EQUAL(ControlMode::Monitor, snapshot.control.mode);
+  TEST_ASSERT_EQUAL_INT8(0, snapshot.control.optimizerDirection);
+}
+
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_sensor_value_default_is_invalid);
@@ -66,5 +75,6 @@ int main(int, char**) {
   RUN_TEST(test_actuator_state_defaults_off);
   RUN_TEST(test_control_mode_monitor_is_first);
   RUN_TEST(test_control_state_defaults_monitor_zero);
+  RUN_TEST(test_runtime_snapshot_defaults_safe);
   return UNITY_END();
 }
