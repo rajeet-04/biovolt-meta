@@ -1,8 +1,11 @@
 {
-  "schema_version": 1,
-  "command_id": "cmd-01783",
-  "type": "set_led_pwm",
-  "payload": {
-    "value": 130
-  }
+  "schema_version": "device-command.v1",
+  "command_id": "7b0a82c6-55c6-4af2-8aac-8dbf93ee3a17",
+  "device_id": "biovolt-01",
+  "experiment_id": null,
+  "issued_at": "2026-08-23T13:10:00Z",
+  "expires_at": "2026-08-23T13:10:10Z",
+  "ttl_ms": 10000,
+  "kind": "set_led_pwm",
+  "payload": {"pwm": 96}
 }

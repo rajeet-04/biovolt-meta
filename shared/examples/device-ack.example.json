@@ -1,0 +1,10 @@
+{
+  "schema_version": "device-ack.v1",
+  "command_id": "7b0a82c6-55c6-4af2-8aac-8dbf93ee3a17",
+  "device_id": "biovolt-01",
+  "status": "applied",
+  "uptime_ms": 153400,
+  "reason_code": null,
+  "message": null,
+  "applied_state": {"mode": "manual", "grow_led_pwm": 96, "mixer_on": false}
+}
