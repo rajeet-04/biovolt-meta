@@ -1,0 +1,5 @@
+experiment_id,evidence_class,arm_id,arm_mode,elapsed_s,sequence,uptime_ms,power_uw,cumulative_energy_mj,od680,grow_led_pwm,mixer_on
+exp-negative,measured,passive,passive,0,1,100,10,0,0.2,100,false
+exp-negative,measured,passive,passive,1,2,1100,10,10,0.3,100,false
+exp-negative,measured,adaptive,adaptive,0,1,100,8,0,0.2,80,false
+exp-negative,measured,adaptive,adaptive,1,2,1100,8,8,0.3,80,false
