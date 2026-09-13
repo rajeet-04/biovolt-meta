@@ -71,5 +71,12 @@ services:
       nginx:
         condition: service_healthy
 
+  frontend:
+    profiles:
+      - frontend
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+
 volumes:
   biovolt-data:
