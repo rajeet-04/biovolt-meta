@@ -22,6 +22,7 @@ dist/
 
 # Future PlatformIO
 .pio/
+firmware/esp32/include/BuildSecrets.h
 
 # Runtime data
 data/*.db

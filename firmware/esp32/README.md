@@ -23,6 +23,16 @@ Phase 3.1: PlatformIO project bootstrapped. See Build and test below.
 GPIO 25/26/27 are logic outputs only. Probe LED, grow-light load, and mixer
 require suitable external driver stages.
 
+## First-boot configuration
+
+Copy the placeholder-only example and fill it with local network credentials.
+Do not commit the resulting file; the backend host must be the address actually
+assigned by the laptop hotspot or local network.
+
+```bash
+cp firmware/esp32/include/BuildSecrets.example.h firmware/esp32/include/BuildSecrets.h
+```
+
 ## Build and test
 
 The firmware is built and tested with [PlatformIO](https://platformio.org/).
@@ -59,4 +69,3 @@ WebSocket client) is added in later modules: 3.2 (config/NVS),
 will add FreeRTOS tasks from `setup()`. The default `ActuatorState`
 (PWM = 0, mixer off) and `ControlMode::Monitor` reflect the
 "firmware starts from safe actuator defaults" constraint.
-
