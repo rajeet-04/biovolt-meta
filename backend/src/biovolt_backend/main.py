@@ -7,6 +7,7 @@ from biovolt_backend.api.health import router as health_router
 from biovolt_backend.api.status import router as status_router
 from biovolt_backend.api.telemetry import router as telemetry_router
 from biovolt_backend.config import Settings
+from biovolt_backend.domain.continuity import TelemetryContinuityTracker
 from biovolt_backend.domain.energy import EnergyAccumulator
 from biovolt_backend.domain.processing import ProcessingConfig
 from biovolt_backend.persistence.database import create_engine_and_session, init_database
@@ -39,6 +40,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 bpw34_blank_raw=settings.bpw34_blank_raw,
             ),
             energy=EnergyAccumulator(),
+            continuity=TelemetryContinuityTracker(),
             throttle=PersistenceThrottle(),
             repository=app.state.telemetry_repository,
             dashboard_hub=app.state.dashboard_hub,
