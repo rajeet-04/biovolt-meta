@@ -20,12 +20,12 @@ export function AppShell() {
   }, [])
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-bio-bg">
       <TopBar isMenuOpen={isMenuOpen} onMenuToggle={() => setIsMenuOpen((open) => !open)} />
       <AccessModeBanner />
       <div className="md:flex">
         <Sidebar isOpen={isMenuOpen} onNavigate={() => setIsMenuOpen(false)} />
-        <section className="min-w-0 flex-1 p-4 md:p-8">
+        <section className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-9 xl:px-12">
           <Outlet />
         </section>
       </div>

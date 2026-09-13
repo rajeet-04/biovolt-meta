@@ -26,7 +26,7 @@ export function SourceSelector() {
       {selectorLabel}
       <select
         aria-label={selectorLabel}
-        className="rounded-md border border-bio-border bg-bio-panel px-2 py-1 text-bio-text"
+        className="rounded-md border border-bio-border bg-bio-panel-strong px-2 py-1 text-bio-text"
         value={activeSource}
         onChange={(event) => useTelemetryStore.getState().selectSource(event.target.value as SourceKey)}
       >

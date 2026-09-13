@@ -21,9 +21,10 @@ export function FreshnessBadge({ timestamp, nowMs, thresholdMs }: FreshnessBadge
   return (
     <span
       aria-live="polite"
-      className="inline-flex items-center rounded-full border border-bio-border px-2.5 py-1 text-xs font-medium text-bio-text"
+      className={`inline-flex items-center gap-2 rounded-full border border-bio-border px-2.5 py-1 text-xs font-medium ${stale ? 'text-bio-warning' : 'text-bio-success'}`}
       role="status"
     >
+      <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${stale ? 'bg-bio-warning' : 'bg-bio-success'}`} />
       {stale ? 'Stale' : 'Live'}
     </span>
   )
