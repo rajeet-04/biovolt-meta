@@ -34,4 +34,6 @@ same proxy target, controlled by `BIOVOLT_PROXY_TARGET` (default
 `http://localhost:8000`). The container sets
 `BIOVOLT_PROXY_TARGET=http://backend:8000` so it can reach the FastAPI service
 in `docker compose --profile frontend`. Override it with `--build-arg` or
-`docker run -e BIOVOLT_PROXY_TARGET=...` to point at another host.
+`docker run -e BIOVOLT_PROXY_TARGET=...` to point at another host. For local
+work without the full compose stack, run `BIOVOLT_PROXY_TARGET=… npm run
+preview` to start the preview server with a custom proxy target.

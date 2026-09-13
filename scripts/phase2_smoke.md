@@ -84,10 +84,3 @@ The frontend must not require a code change to switch from the simulator to
 the ESP32: stop the simulator, point the ESP32 at the laptop's
 `ws://<laptop-hotspot-ip>:8000/ws/device` endpoint with the configured shared
 token, and rerun the live and offline checks.
-
-## 6. Commit
-
-```bash
-git add scripts/phase2_smoke.md README.md
-git commit -m "docs: add Phase 2 PWA acceptance checklist"
-```

@@ -79,9 +79,9 @@ curl http://localhost:8000/api/system/status
 
 The React PWA preview is opt-in through the `frontend` profile. It builds the
 `frontend/Dockerfile` preview server, depends on a healthy backend, and serves
-on `http://localhost:4173`. It expects `BIOVOLT_DEVICE_SHARED_TOKEN` to be set
-in the environment or `.env`, the same as the backend. Start the backend and
-PWA together with:
+on `http://localhost:4173`. The frontend itself does not require
+`BIOVOLT_DEVICE_SHARED_TOKEN`; the token is only used by the backend when
+accepting device connections. Start the backend and PWA together with:
 
 ```bash
 docker compose --profile frontend up --build -d
