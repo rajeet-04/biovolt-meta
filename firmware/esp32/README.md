@@ -18,6 +18,11 @@ Phase 0 contains no firmware runtime code.
 
 Phase 3.1: PlatformIO project bootstrapped. See Build and test below.
 
+## Driver-stage warning (Phase 3.2)
+
+GPIO 25/26/27 are logic outputs only. Probe LED, grow-light load, and mixer
+require suitable external driver stages.
+
 ## Build and test
 
 The firmware is built and tested with [PlatformIO](https://platformio.org/).
