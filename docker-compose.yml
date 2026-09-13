@@ -43,5 +43,19 @@ services:
       - BIOVOLT_SIM_INTERVAL_SECONDS=0.5
       - BIOVOLT_SIM_SEED=42
 
+  frontend:
+    profiles:
+      - frontend
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - BIOVOLT_PROXY_TARGET=http://backend:8000
+    ports:
+      - "4173:4173"
+
 volumes:
   biovolt-data:

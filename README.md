@@ -77,6 +77,19 @@ docker compose --profile simulator up --build -d
 curl http://localhost:8000/api/system/status
 ```
 
+The React PWA preview is opt-in through the `frontend` profile. It builds the
+`frontend/Dockerfile` preview server, depends on a healthy backend, and serves
+on `http://localhost:4173`. The frontend itself does not require
+`BIOVOLT_DEVICE_SHARED_TOKEN`; the token is only used by the backend when
+accepting device connections. Start the backend and PWA together with:
+
+```bash
+docker compose --profile frontend up --build -d
+```
+
+Add `--profile simulator` to bring the simulator online alongside the PWA
+without restarting the frontend.
+
 The optional `BIOVOLT_BPW34_DARK_RAW` and `BIOVOLT_BPW34_BLANK_RAW` settings
 should remain commented out when unused. Compose passes those values only when
 they are defined, avoiding blank strings that strict Pydantic float settings
@@ -101,6 +114,12 @@ same Phase 0 `device-telemetry.v1` JSON schema and authentication headers:
 The backend route, scientific processing, database, and dashboard contract do
 not change. The switchover does not require a simulator install, a simulator
 container in the demo, feature flags, or a second telemetry table.
+
+## Phase 2 PWA acceptance checks
+
+With the PWA preview serving on `http://localhost:4173`, follow the operator
+checklist in [`scripts/phase2_smoke.md`](scripts/phase2_smoke.md) to verify
+live telemetry, simulator removal, and offline/installed-PWA behavior.
 
 ## Phase 1 acceptance checks
 
