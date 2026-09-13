@@ -1,0 +1,5 @@
+import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { listCalibrationProfiles } from '../lib/calibrationApi'
+import type { CalibrationProfile } from '../types/calibration'
+export function CalibrationPage() { const [profiles, setProfiles] = useState<CalibrationProfile[]>([]); useEffect(() => { void listCalibrationProfiles().then(setProfiles).catch(() => setProfiles([])) }, []); return <section className="grid gap-4"><div className="flex items-center justify-between"><h1 className="text-2xl font-semibold text-bio-text">Calibration profiles</h1><Link className="rounded bg-bio-accent px-3 py-2 text-sm text-bio-bg" to="/calibration/new">New calibration</Link></div>{profiles.length === 0 ? <p className="text-bio-muted">No saved profiles yet.</p> : profiles.map((profile) => <article className="rounded border border-bio-border bg-bio-panel p-4" key={profile.id}><h2 className="font-semibold text-bio-text">{profile.name}</h2><p className="text-sm text-bio-muted">{profile.revisions.length} immutable revision(s); active: {profile.active_revision_id ?? 'none'}</p></article>)}</section> }
