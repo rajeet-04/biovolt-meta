@@ -180,3 +180,6 @@ measured-performance claim. Build a non-sensitive evidence index with
 `uv run --extra dev python scripts/release/build_evidence_index.py release-evidence --output release-evidence/index.json`.
 The resilience, product, and final gates fail closed until real HIL, soak,
 journey, screenshot, security, and traceability evidence is supplied.
+CI also runs a 60-minute-equivalent deterministic simulator smoke with an
+explicit sensor-fault frame; this validates the hardware placeholder path but
+is never treated as physical HIL evidence.

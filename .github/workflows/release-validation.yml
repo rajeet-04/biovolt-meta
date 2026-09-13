@@ -35,3 +35,6 @@ jobs:
 
       - name: Run scientific release gate
         run: uv run python scripts/release/phase9_science_gate.py --root .
+
+      - name: Run hardware-placeholder simulator smoke
+        run: uv run python scripts/release/simulation_smoke.py --minutes 60 --fault light_null
