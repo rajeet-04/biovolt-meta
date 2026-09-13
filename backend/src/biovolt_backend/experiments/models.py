@@ -23,6 +23,7 @@ class Experiment(Base):
     ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     notes: Mapped[str | None] = mapped_column(String(4000))
     calibration_profile_id: Mapped[str | None] = mapped_column(String(64))
+    evidence_class: Mapped[str] = mapped_column(String(20), nullable=False, default="measured")
     arms: Mapped[list["ExperimentArm"]] = relationship(
         back_populates="experiment", cascade="all, delete-orphan"
     )
